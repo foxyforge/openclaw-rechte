@@ -1,13 +1,93 @@
 # Vorstellung beim OpenClaw-Team – Textentwurf
 
-Chris postet selbst. Vorher: Repo auf GitHub anlegen (z. B. `foxyforge/openclaw-rechte`), pushen, Link unten eintragen.
-Zwei Fassungen: lang für eine GitHub-Discussion („Show and tell“) oder ein Issue, kurz für Discord/Chat.
+Chris postet selbst. Repo: https://github.com/foxyforge/openclaw-rechte
+
+**Wo:** Das OpenClaw-Repo hat keine Discussions und keine freien Issues. Laut CONTRIBUTING.md gehen neue Ideen als
+**Feature request** (Formular) oder zuerst in den Discord (https://discord.gg/clawd). Kein Fork nötig – ein Fork wäre
+nur für einen Pull Request in OpenClaws eigenen Code.
+
+Formular: https://github.com/openclaw/openclaw/issues/new?template=feature_request.yml – Feld für Feld aus dem
+Abschnitt „GitHub-Issue“ unten kopieren. Für Discord die kurze Fassung ganz unten.
 
 ---
 
-## Lang (GitHub Discussion / Issue)
+## GitHub-Issue (Feature request), Feld für Feld
 
-**Title:** Plugin: per-channel tool rights table (allow / ask / off), switchable from the chat
+**Title:** `[Feature]: Per-channel tool rights table (allow / ask / off), switchable from the chat – available as a plugin`
+
+**Summary**
+```
+A per-channel × per-tool rights table with three levels (allow / ask / off), shown as buttons in the chat (/rights)
+and enforced in code via before_tool_call. Built and tested as an external plugin; sharing it in case the idea (or
+the plugin) is useful for OpenClaw.
+```
+
+**Problem to solve**
+```
+OpenClaw already has tools.allow/deny, sandboxing and exec approvals, but there is no single simple place where a
+user can say, per channel, "this tool is fine, ask me for that one, never do this" – and change it from the phone
+without editing config or restarting. In practice the phone/Telegram channel should get fewer rights than the desk,
+and "ask" is the level people use most. Today "ask" for arbitrary tools is only reachable through a plugin, and the
+per-channel view does not exist at all.
+```
+
+**Proposed solution**
+```
+One table: channel × tool → allow / ask / off. Lookup order: channel entry → "*" entry → default (allow, so nothing
+changes for users who do not configure it).
+
+- /rights shows the table for the current channel as buttons; tapping a button cycles allow → ask → off, the same
+  message is edited in place. /rights <tool> <level>, /rights * <tool> <level>, /rights default <level> as text.
+- before_tool_call: "off" returns block with a reason the model can relay ("switched off in channel X, tell the user
+  they can enable it with /rights"); "ask" returns requireApproval with allow-once/deny only (an "allow always" would
+  bypass the table); "allow" returns nothing.
+- Button presses use callback data "rechte:…" and registerInteractiveHandler, so they go straight to the plugin and
+  the model never sees them. Only the owner (commands.ownerAllowFrom) can switch.
+- Tools the model uses for the first time are added to the table automatically. Corrupt table → every tool call
+  blocked (fail closed). Approval card shows shortened parameters with token/key/password redacted.
+
+All of this exists and runs today as an external plugin (link below). If the project prefers it in core or in a
+different shape, I would rather adapt it than keep a separate plugin.
+```
+
+**Alternatives considered**
+```
+- tools.allow/deny: hard on/off only, global or per agent, config file + restart, no "ask", no per-channel view.
+- Exec approvals: only cover exec, not arbitrary tools.
+- Prompt rules ("never write files from Telegram"): not enforced; the model can ignore them.
+```
+
+**Impact**
+```
+Affected: anyone running one agent on several channels (phone + desk), especially non-technical users.
+Severity: medium – without it, either everything is allowed on every channel or the user edits config and restarts.
+Frequency: daily – "ask" is the level used most in practice.
+Consequence: risky tools run from the phone without a question, or users give up on restricting them.
+```
+
+**Evidence/examples**
+```
+Plugin repo (README in English and German, screenshots, 13 tests, no dependencies, MIT):
+https://github.com/foxyforge/openclaw-rechte
+Verified live on OpenClaw 2026.9.6 with the Telegram channel: all three levels, approval buttons, in-place cycling
+with no model reply. Prior art: a private agent ("Foxy") where the same table has been in daily use for months.
+```
+
+**Do you plan to open a PR for this?** → `Maybe, with maintainer guidance`
+
+**Additional information**
+```
+Buttons are Telegram-only so far (other channels get text commands). "ask" needs a surface that can show approvals;
+CLI and heartbeat/automation runs fail closed. Visible strings are English by default with a German option;
+identifiers in the code are German – renaming is mechanical if wanted.
+```
+
+---
+
+## Lang (falls doch mal eine Discussion oder ein freies Textfeld)
+
+---
+
 
 Hi all,
 

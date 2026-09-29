@@ -9,7 +9,7 @@
 // Diese Datei hat keine Abhängigkeit von OpenClaw, damit sie sich ohne Gateway testen lässt (node --test).
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 
 export const STUFEN = ['allow', 'ask', 'off'];
 export const ZEICHEN = { allow: '🟢', ask: '🟡', off: '🔴' };
@@ -54,6 +54,8 @@ const TEXTE = {
     nichtGeaendert: (m) => `Not changed: ${m}`,
     befehlBeschreibung: 'Rights per tool: table with buttons (tap to cycle) · /rights <tool> <allow|ask|off>',
     codeModeOffen: 'Code Mode runs without the QuickJS sandbox (tools.codeMode.executor ≠ "quickjs") – asking instead of allowing.',
+    geschuetzt: (d) => `“${d}” is protected (rights table): only the owner changes this file. Do not try another way.`,
+    geschuetztFrage: (d) => `Protected file ${d}.`,
   },
   de: {
     stufe: { allow: 'frei', ask: 'nachfragen', off: 'aus' },
@@ -83,6 +85,8 @@ const TEXTE = {
     nichtGeaendert: (m) => `Nicht geändert: ${m}`,
     befehlBeschreibung: 'Rechte je Werkzeug: Tabelle mit Tasten (tippen schaltet weiter) · /rechte <werkzeug> <frei|nachfragen|aus>',
     codeModeOffen: 'Code Mode läuft ohne QuickJS-Abschottung (tools.codeMode.executor ≠ "quickjs") – deshalb Rückfrage statt frei.',
+    geschuetzt: (d) => `„${d}“ ist geschützt (Rechte-Tabelle): Diese Datei ändert nur Chris. Versuche es nicht auf anderem Weg.`,
+    geschuetztFrage: (d) => `Geschützte Datei ${d}.`,
   },
 };
 
@@ -195,6 +199,28 @@ export function codeModeIsoliert(config) {
   return Boolean(cm && typeof cm === 'object' && cm.executor === 'quickjs');
 }
 
+// Geschützte Dateien: Werkzeuge, die schreiben, dürfen bestimmte Pfade gar nicht („aus“) oder nur nach Rückfrage
+// („nachfragen“) anfassen – etwa die Charakter- und Regel-Dateien des Agenten. Einstellung „schutz“ der Erweiterung,
+// Pfade relativ zum Arbeitsordner des Agenten oder absolut; ein Ordner schützt alles darin. Gilt vor der Tabelle.
+export const SCHREIBWERKZEUGE = ['write', 'edit', 'apply_patch'];
+export function pfadeAus(params, derivedPaths) {
+  return [params?.path, params?.file_path, params?.filePath, params?.target, ...(derivedPaths ?? [])]
+    .filter((p) => typeof p === 'string' && p.trim() !== '');
+}
+export function schutzTreffer(werkzeug, pfade, schutz, basis) {
+  if (!SCHREIBWERKZEUGE.includes(werkzeug) || !schutz || typeof schutz !== 'object') return undefined;
+  const liste = (werte) => (Array.isArray(werte) ? werte : []).filter((w) => typeof w === 'string' && w).map((w) => resolve(basis, w));
+  const aus = liste(schutz.aus);
+  const frage = liste(schutz.nachfragen);
+  const drin = (p, g) => p === g || p.startsWith(g + sep);
+  let ergebnis;
+  for (const p of pfade.map((x) => resolve(basis, x))) {
+    if (aus.some((g) => drin(p, g))) return { stufe: 'off', pfad: p };
+    if (!ergebnis && frage.some((g) => drin(p, g))) ergebnis = { stufe: 'ask', pfad: p };
+  }
+  return ergebnis;
+}
+
 // Kurzfassung der Parameter für die Freigabe-Karte: nur Schlüssel und gekürzte Werte, Geheimnisse geschwärzt.
 const GEHEIM = /(key|token|secret|passw|password|auth|cookie)/i;
 export function kurzfassung(params) {
@@ -212,10 +238,14 @@ export function kurzfassung(params) {
 }
 
 // Die eigentliche Entscheidung für before_tool_call. Rückgabe im Format von OpenClaw.
-export function entscheiden(tabelle, kanal, werkzeug, params, { codeModeIsoliert: isoliert = true } = {}) {
+export function entscheiden(tabelle, kanal, werkzeug, params, { codeModeIsoliert: isoliert = true, geschuetzt } = {}) {
   let s = stufe(tabelle, kanal, werkzeug);
   let hinweis = '';
   if (werkzeug === CODE_MODE && s === 'allow' && !isoliert) { s = 'ask'; hinweis = `${T.codeModeOffen} `; }
+  if (s !== 'off' && geschuetzt?.stufe === 'off') {
+    return { block: true, blockReason: T.geschuetzt(geschuetzt.pfad) };
+  }
+  if (s === 'allow' && geschuetzt?.stufe === 'ask') { s = 'ask'; hinweis = `${T.geschuetztFrage(geschuetzt.pfad)} `; }
   if (s === 'off') {
     return { block: true, blockReason: T.gesperrt(werkzeug, kanal) };
   }

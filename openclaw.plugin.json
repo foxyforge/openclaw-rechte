@@ -2,16 +2,40 @@
   "id": "rechte",
   "name": "Rechte",
   "description": "Rights table: per channel and tool allow, ask or off. Switch with /rights (alias /rechte).",
-  "activation": { "onStartup": true },
+  "activation": {
+    "onStartup": true
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
       "language": {
         "type": "string",
-        "enum": ["en", "de"],
+        "enum": [
+          "en",
+          "de"
+        ],
         "default": "en",
         "description": "Language of the visible texts (table, buttons, messages). Commands and level names are accepted in both languages regardless."
+      },
+      "schutz": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Protected paths for write/edit/apply_patch (relative to the agent workspace or absolute; a folder protects everything in it). \"aus\": never, \"nachfragen\": ask first. Applies before the table.",
+        "properties": {
+          "aus": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nachfragen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       }
     }
   }

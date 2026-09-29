@@ -86,6 +86,21 @@ show up on the next `/rights`.
   `code_mode` with the hardened QuickJS executor (`tools.codeMode.executor: "quickjs"`); with the default executor
   (node:vm, per OpenClaw not a security boundary) it is downgraded to ask.
 
+## Protected files (since 0.6)
+
+Some files the agent should never change itself – its character and its rules, for example. The `schutz` setting lists
+paths (relative to the agent workspace or absolute; a folder protects everything in it) for which `write`, `edit` and
+`apply_patch` are blocked (`aus`) or ask first (`nachfragen`). This applies before the table: even if `write` is allowed,
+`SOUL.md` stays closed. Reading stays allowed.
+
+```json
+"entries": { "rechte": { "config": { "language": "en",
+  "schutz": { "aus": ["SOUL.md", "IDENTITY.md", "AGENTS.md", "skills"], "nachfragen": ["USER.md"] } } } }
+```
+
+Together with OpenClaw's `tools.fs.workspaceOnly: true` this means: the agent writes only in its workspace, and there
+not to its own rules.
+
 ## The table file
 
 Lives at `<state-dir>/rechte/tabelle.json` (mode 600), written atomically (`.neu` first, then rename).
@@ -138,7 +153,7 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 - **Secrets:** none. The only setting is `language` (`en`/`de`).
 - **Updating:** install the new version (or `git pull` the folder) and restart the gateway. The table is kept; older tables
   with German level names are translated on load.
-- **Smoke test without a gateway:** `npm test` (15 tests, Node only).
+- **Smoke test without a gateway:** `npm test` (16 tests, Node only).
 - **Smoke test on a live gateway (Telegram):** `/rights read off`, then ask the bot to read a file → it reports the block and
   does not read. `/rights read ask` → approval card, after "Allow" it reads. `/rights read allow` → reads without asking.
 
@@ -146,7 +161,7 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 
 - `rechte.js` – all the logic, no OpenClaw dependency (table, decision, command, buttons, texts en/de).
 - `index.js` – the OpenClaw entry (`before_tool_call`, `/rights` + `/rechte`, button handler).
-- `test/rechte.test.js` – 15 tests, `npm test` (Node only, no extra packages).
+- `test/rechte.test.js` – 16 tests, `npm test` (Node only, no extra packages).
 
 Verified live on 2026-09-29 in Telegram: show the table; all three levels (allow reads without asking, ask shows
 the approval buttons and reads after "Allow", off is intercepted in code and explained to the user); buttons

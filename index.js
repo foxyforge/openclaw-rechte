@@ -11,6 +11,8 @@ export default definePluginEntry({
     const datei = join(api.runtime.state.resolveStateDir(), 'rechte', 'tabelle.json');
     R.spracheSetzen(api.pluginConfig?.language);   // 'de' oder 'en' (Standard); nur die sichtbaren Texte
     const T = R.texte();
+    // Bezugsordner für geschützte Pfade: der Arbeitsordner des Agenten (relative Werkzeug-Pfade gelten dort).
+    const arbeitsordner = api.config?.agents?.defaults?.workspace ?? join(api.runtime.state.resolveStateDir(), 'workspace');
 
     api.on('before_tool_call', (event, ctx) => {
       const werkzeug = R.werkzeugName(event, ctx);
@@ -26,7 +28,8 @@ export default definePluginEntry({
         tabelle.bekannt.push(werkzeug);
         try { R.speichern(datei, tabelle); } catch (fehler) { api.logger?.warn?.(`rechte: ${fehler.message}`); }
       }
-      return R.entscheiden(tabelle, kanal, werkzeug, event?.params, { codeModeIsoliert: R.codeModeIsoliert(api.config) });
+      const geschuetzt = R.schutzTreffer(werkzeug, R.pfadeAus(event?.params, event?.derivedPaths), api.pluginConfig?.schutz, arbeitsordner);
+      return R.entscheiden(tabelle, kanal, werkzeug, event?.params, { codeModeIsoliert: R.codeModeIsoliert(api.config), geschuetzt });
     }, { priority: 100 });
 
     // Tastendruck in Telegram: kommt direkt hierher (nicht ans Modell) und ändert dieselbe Nachricht.

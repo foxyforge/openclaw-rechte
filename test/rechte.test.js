@@ -170,3 +170,21 @@ test('Code Mode ist kein Shell-exec: eigener Eintrag, frei nur mit QuickJS', () 
   // shell-exec bleibt, wie er in der Tabelle steht
   assert.equal(R.entscheiden(R.setzen(t, 'telegram', 'exec', 'aus'), 'telegram', 'exec', {}).block, true);
 });
+
+test('geschützte Dateien: aus blockt, nachfragen fragt, gilt vor „frei“, nur für Schreibwerkzeuge', () => {
+  const schutz = { aus: ['SOUL.md', 'skills'], nachfragen: ['USER.md'] };
+  const basis = '/ws';
+  const t = R.setzen(R.setzen(R.leer(), 'telegram', 'write', 'frei'), 'telegram', 'edit', 'frei');
+  const g1 = R.schutzTreffer('write', R.pfadeAus({ path: 'SOUL.md' }), schutz, basis);
+  assert.deepEqual(g1, { stufe: 'off', pfad: '/ws/SOUL.md' });
+  assert.match(R.entscheiden(t, 'telegram', 'write', { path: 'SOUL.md' }, { geschuetzt: g1 }).blockReason, /geschützt/);
+  const g2 = R.schutzTreffer('edit', R.pfadeAus({ file_path: '/ws/skills/x/SKILL.md' }), schutz, basis);
+  assert.equal(g2.stufe, 'off');
+  const g3 = R.schutzTreffer('edit', R.pfadeAus({ path: './USER.md' }), schutz, basis);
+  assert.match(R.entscheiden(t, 'telegram', 'edit', {}, { geschuetzt: g3 }).requireApproval.description, /Geschützte Datei/);
+  assert.equal(R.schutzTreffer('write', R.pfadeAus({ path: 'memory/projekte/x.md' }), schutz, basis), undefined);
+  assert.equal(R.schutzTreffer('write', R.pfadeAus({ path: 'memory/../SOUL.md' }), schutz, basis).stufe, 'off');
+  assert.equal(R.schutzTreffer('read', R.pfadeAus({ path: 'SOUL.md' }), schutz, basis), undefined);   // lesen bleibt frei
+  assert.equal(R.schutzTreffer('write', ['SOUL.md.bak'], schutz, basis), undefined);                  // kein Präfix-Irrtum
+  assert.equal(R.schutzTreffer('write', ['SOUL.md'], undefined, basis), undefined);                   // ohne Einstellung nichts
+});

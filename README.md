@@ -87,6 +87,21 @@ sie beim nächsten `/rechte` sieht.
   (`tools.codeMode.executor: "quickjs"`); mit dem Standard-Ausführer (node:vm, laut OpenClaw keine Sicherheitsgrenze)
   wird daraus eine Rückfrage.
 
+## Geschützte Dateien (ab 0.6)
+
+Manche Dateien soll der Agent nie selbst ändern – etwa seinen Charakter und seine Regeln. Die Einstellung `schutz`
+nennt Pfade (relativ zum Arbeitsordner des Agenten oder absolut; ein Ordner schützt alles darin), für die `write`,
+`edit` und `apply_patch` gesperrt sind (`aus`) oder erst nachfragen (`nachfragen`). Das gilt vor der Tabelle: Auch wenn
+`write` frei ist, bleibt `SOUL.md` zu. Lesen bleibt erlaubt.
+
+```json
+"entries": { "rechte": { "config": { "language": "de",
+  "schutz": { "aus": ["SOUL.md", "IDENTITY.md", "AGENTS.md", "skills"], "nachfragen": ["USER.md"] } } } }
+```
+
+Zusammen mit `tools.fs.workspaceOnly: true` (OpenClaw) heißt das: Der Agent schreibt nur in seinem Arbeitsordner, und
+dort nicht an seinen eigenen Regeln.
+
 ## Die Tabelle
 
 Liegt unter `<state-dir>/rechte/tabelle.json` (Rechte 600), wird atomar geschrieben (erst `.neu`, dann umbenannt).
@@ -141,7 +156,7 @@ erlaubt.
 - **Geheimnisse:** keine. Einzige Einstellung: `language` (`en`/`de`).
 - **Aktualisieren:** neue Version installieren (bzw. Ordner per `git pull` holen), Gateway neu starten. Die Tabelle bleibt
   erhalten; ältere Tabellen mit deutschen Stufen werden beim Laden übersetzt.
-- **Prüfung ohne Gateway:** `npm test` (15 Tests, nur Node).
+- **Prüfung ohne Gateway:** `npm test` (16 Tests, nur Node).
 - **Prüfung am lebenden Gateway (Telegram):** `/rights read off`, dann den Bot bitten, eine Datei zu lesen → er meldet die
   Sperre und liest nicht. `/rights read ask` → Freigabe-Karte, nach „Erlauben“ liest er. `/rights read allow` → liest ohne Frage.
 
@@ -149,7 +164,7 @@ erlaubt.
 
 - `rechte.js` – die ganze Logik, ohne OpenClaw-Abhängigkeit (Tabelle, Entscheidung, Befehl, Tasten, Texte de/en).
 - `index.js` – der Einstieg für OpenClaw (`before_tool_call`, `/rights` + `/rechte`, Tastendruck-Handler).
-- `test/rechte.test.js` – 15 Tests, `npm test` (nur Node, keine weiteren Pakete).
+- `test/rechte.test.js` – 16 Tests, `npm test` (nur Node, keine weiteren Pakete).
 
 Live geprüft am 29.09.2026 in Telegram: Tabelle anzeigen, alle drei Stufen (frei liest ohne Frage, nachfragen zeigt
 die Freigabe-Tasten und liest nach „Erlauben“, aus wird im Programm abgefangen und dem Nutzer erklärt), Tasten

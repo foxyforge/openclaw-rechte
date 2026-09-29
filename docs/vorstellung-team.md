@@ -41,7 +41,7 @@ Logic is framework-free (`rechte.js`, 12 tests with `node --test`, no dependenci
 other channels get text + `/rights <tool> <level>`. Visible strings are English by default, German via a
 `language` setting; identifiers in the code are German (I'm German, happy to rename if that matters).
 
-Repo: **<LINK>** – README in English and German, MIT.
+Repo: **https://github.com/foxyforge/openclaw-rechte** – README in English and German, MIT.
 
 I'm not attached to the shape. If something like this belongs in core, or should look different to fit, I'd rather
 adapt it than keep a separate plugin. Feedback welcome.
@@ -54,4 +54,4 @@ Built a small plugin for 2026.9.6: a per-channel × per-tool rights table (🟢 
 buttons via `/rights`, tap to cycle, enforced in code through `before_tool_call` (block / requireApproval). Button
 presses go straight to the plugin via `registerInteractiveHandler`, so the model never sees them. Default allow, so
 it changes nothing until you set something. Tested live in Telegram, 12 tests, no deps, MIT.
-Repo: <LINK> – feedback welcome, happy to adapt it if the project wants it in a different shape.
+Repo: https://github.com/foxyforge/openclaw-rechte – feedback welcome, happy to adapt it if the project wants it in a different shape.

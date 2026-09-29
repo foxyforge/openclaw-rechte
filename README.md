@@ -93,6 +93,8 @@ erlaubt.
   Weg. Sag dem Nutzer, dass er es mit /rechte freischalten kann.“) – so erklärt der Bot die Sperre, statt zu raten.
 - **„nachfragen“ erlaubt nur `allow-once` und `deny`.** Ein „immer erlauben“ würde an der Tabelle vorbeigehen; wer
   dauerhaft frei will, schaltet die Stufe um.
+
+  <img src="docs/freigabe-telegram.jpg" width="340" alt="Ablauf in Telegram: Nutzer bittet um eine Datei, OpenClaw meldet die einmalige Freigabe für „read ausführen? Kanal telegram. path: /etc/hostname“, danach die Antwort des Bots">
 - **Die Freigabe-Karte zeigt die Parameter gekürzt**, Schlüssel wie `token`, `key`, `password` geschwärzt.
 - **Umschalten darf nur der Besitzer** (`commands.ownerAllowFrom`). Tastendrücke von Fremden werden still ignoriert.
 - **Tastendrücke gehen direkt an die Erweiterung**, nicht ans Modell (`registerInteractiveHandler`, Namensraum

@@ -92,6 +92,8 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
   user they can enable it with /rights.") – so the bot explains the block instead of guessing.
 - **"ask" allows only `allow-once` and `deny`.** An "allow always" would bypass the table; if you want it
   permanent, switch the level.
+
+  <img src="docs/freigabe-telegram.jpg" width="340" alt="Flow in Telegram (German UI): the user asks for a file, OpenClaw reports the one-time approval for “read ausführen? Kanal telegram. path: /etc/hostname”, then the bot's answer">
 - **The approval card shows parameters shortened**, keys such as `token`, `key`, `password` redacted.
 - **Only the owner can switch** (`commands.ownerAllowFrom`). Button presses from anyone else are silently ignored.
 - **Button presses go straight to the plugin**, not to the model (`registerInteractiveHandler`, namespace

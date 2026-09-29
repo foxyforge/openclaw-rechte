@@ -75,6 +75,18 @@ statt an den Befehl.
 Werkzeuge, die das Modell zum ersten Mal benutzt, kommen automatisch in die Tabelle (Liste `bekannt`), damit man
 sie beim nächsten `/rechte` sieht.
 
+## Kanal und Code Mode (ab 0.5)
+
+- **Welcher Kanal?** OpenClaw nennt den Absender (`requester`) nur, wenn es ihn belegen kann. Mit der Codex-Laufzeit
+  (GPT-Modelle über das ChatGPT-Abo) fehlt er – dann nimmt die Erweiterung `channelId` aus dem Werkzeug-Kontext. Fehlt
+  auch das, gilt der Kanal als `unknown`, und es gelten die Einträge für alle Kanäle (streng statt offen).
+- **`code_mode`** ist ein eigener Eintrag: Im Code Mode schreibt das Modell ein kleines JavaScript, das die Werkzeuge
+  aufruft. OpenClaw meldet diesen Rahmen als `exec` mit `toolKind: "code_mode_exec"` – das ist **kein** Shell-Befehl
+  und wird deshalb nicht mit `exec` verwechselt. Jedes Werkzeug, das der Code aufruft, prüft die Erweiterung trotzdem
+  einzeln. **Frei** gilt für `code_mode` nur mit dem abgeschotteten QuickJS-Ausführer
+  (`tools.codeMode.executor: "quickjs"`); mit dem Standard-Ausführer (node:vm, laut OpenClaw keine Sicherheitsgrenze)
+  wird daraus eine Rückfrage.
+
 ## Die Tabelle
 
 Liegt unter `<state-dir>/rechte/tabelle.json` (Rechte 600), wird atomar geschrieben (erst `.neu`, dann umbenannt).
@@ -129,7 +141,7 @@ erlaubt.
 - **Geheimnisse:** keine. Einzige Einstellung: `language` (`en`/`de`).
 - **Aktualisieren:** neue Version installieren (bzw. Ordner per `git pull` holen), Gateway neu starten. Die Tabelle bleibt
   erhalten; ältere Tabellen mit deutschen Stufen werden beim Laden übersetzt.
-- **Prüfung ohne Gateway:** `npm test` (13 Tests, nur Node).
+- **Prüfung ohne Gateway:** `npm test` (15 Tests, nur Node).
 - **Prüfung am lebenden Gateway (Telegram):** `/rights read off`, dann den Bot bitten, eine Datei zu lesen → er meldet die
   Sperre und liest nicht. `/rights read ask` → Freigabe-Karte, nach „Erlauben“ liest er. `/rights read allow` → liest ohne Frage.
 
@@ -137,7 +149,7 @@ erlaubt.
 
 - `rechte.js` – die ganze Logik, ohne OpenClaw-Abhängigkeit (Tabelle, Entscheidung, Befehl, Tasten, Texte de/en).
 - `index.js` – der Einstieg für OpenClaw (`before_tool_call`, `/rights` + `/rechte`, Tastendruck-Handler).
-- `test/rechte.test.js` – 13 Tests, `npm test` (nur Node, keine weiteren Pakete).
+- `test/rechte.test.js` – 15 Tests, `npm test` (nur Node, keine weiteren Pakete).
 
 Live geprüft am 29.09.2026 in Telegram: Tabelle anzeigen, alle drei Stufen (frei liest ohne Frage, nachfragen zeigt
 die Freigabe-Tasten und liest nach „Erlauben“, aus wird im Programm abgefangen und dem Nutzer erklärt), Tasten

@@ -75,6 +75,17 @@ so a tool that is not in any table yet does not simply run.
 Tools the model uses for the first time are added to the table automatically (list `bekannt`, "known") so they
 show up on the next `/rights`.
 
+## Channel detection and Code Mode (since 0.5)
+
+- **Which channel?** OpenClaw only provides the sender (`requester`) when it can prove it. With the Codex runtime (GPT
+  models via a ChatGPT subscription) it is absent – the plugin then uses `channelId` from the tool context. If that is
+  missing too, the channel is `unknown` and the entries for all channels apply (strict, not open).
+- **`code_mode`** is an entry of its own: in Code Mode the model writes a small JavaScript cell that calls tools. OpenClaw
+  reports that wrapper as `exec` with `toolKind: "code_mode_exec"` – it is **not** a shell command and is no longer
+  confused with `exec`. Every tool the code calls is still checked individually. **allow** only takes effect for
+  `code_mode` with the hardened QuickJS executor (`tools.codeMode.executor: "quickjs"`); with the default executor
+  (node:vm, per OpenClaw not a security boundary) it is downgraded to ask.
+
 ## The table file
 
 Lives at `<state-dir>/rechte/tabelle.json` (mode 600), written atomically (`.neu` first, then rename).
@@ -127,7 +138,7 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 - **Secrets:** none. The only setting is `language` (`en`/`de`).
 - **Updating:** install the new version (or `git pull` the folder) and restart the gateway. The table is kept; older tables
   with German level names are translated on load.
-- **Smoke test without a gateway:** `npm test` (13 tests, Node only).
+- **Smoke test without a gateway:** `npm test` (15 tests, Node only).
 - **Smoke test on a live gateway (Telegram):** `/rights read off`, then ask the bot to read a file → it reports the block and
   does not read. `/rights read ask` → approval card, after "Allow" it reads. `/rights read allow` → reads without asking.
 
@@ -135,7 +146,7 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 
 - `rechte.js` – all the logic, no OpenClaw dependency (table, decision, command, buttons, texts en/de).
 - `index.js` – the OpenClaw entry (`before_tool_call`, `/rights` + `/rechte`, button handler).
-- `test/rechte.test.js` – 13 tests, `npm test` (Node only, no extra packages).
+- `test/rechte.test.js` – 15 tests, `npm test` (Node only, no extra packages).
 
 Verified live on 2026-09-29 in Telegram: show the table; all three levels (allow reads without asking, ask shows
 the approval buttons and reads after "Allow", off is intercepted in code and explained to the user); buttons

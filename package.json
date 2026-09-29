@@ -1,6 +1,6 @@
 {
   "name": "@foxyforge/openclaw-rechte",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Rights table for OpenClaw: per channel and tool allow, ask or off – enforced in code, not in the prompt. /rights (alias /rechte).",
   "type": "module",
   "license": "MIT",

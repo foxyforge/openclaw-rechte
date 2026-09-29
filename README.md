@@ -28,6 +28,9 @@ Wer die Erweiterung einschaltet und nichts einstellt, merkt keinen Unterschied: 
 
 ## Einbauen
 
+Am einfachsten über ClawHub: `openclaw plugins install clawhub:@foxyforge/openclaw-rechte`
+(Paket: https://clawhub.ai/foxyforge). Oder von Hand:
+
 1. Ordner irgendwohin legen (z. B. `~/projekte/openclaw-rechte`) – keine Abhängigkeiten, kein Build.
 2. In `openclaw.json` (bzw. der Profil-Konfig) eintragen:
 

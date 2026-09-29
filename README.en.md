@@ -27,6 +27,9 @@ If you enable the plugin and configure nothing, nothing changes: the default is 
 
 ## Install
 
+Easiest via ClawHub: `openclaw plugins install clawhub:@foxyforge/openclaw-rechte`
+(package: https://clawhub.ai/foxyforge). Or by hand:
+
 1. Put the folder anywhere (e.g. `~/projects/openclaw-rechte`) – no dependencies, no build step.
 2. Add to `openclaw.json` (or your profile config):
 

@@ -37,7 +37,7 @@ the same message is edited in place, the model never sees it. Only the owner (`c
 - The agent has no tool to change the table; only the command writes it.
 
 **State.** Verified live in Telegram: all three levels, approval buttons, in-place cycling with no model reply.
-Logic is framework-free (`rechte.js`, 12 tests with `node --test`, no dependencies). Buttons are Telegram-only so far;
+Logic is framework-free (`rechte.js`, 13 tests with `node --test`, no dependencies). Buttons are Telegram-only so far;
 other channels get text + `/rights <tool> <level>`. Visible strings are English by default, German via a
 `language` setting; identifiers in the code are German (I'm German, happy to rename if that matters).
 
@@ -53,5 +53,5 @@ adapt it than keep a separate plugin. Feedback welcome.
 Built a small plugin for 2026.9.6: a per-channel × per-tool rights table (🟢 allow / 🟡 ask / 🔴 off), shown as
 buttons via `/rights`, tap to cycle, enforced in code through `before_tool_call` (block / requireApproval). Button
 presses go straight to the plugin via `registerInteractiveHandler`, so the model never sees them. Default allow, so
-it changes nothing until you set something. Tested live in Telegram, 12 tests, no deps, MIT.
+it changes nothing until you set something. Tested live in Telegram, 13 tests, no deps, MIT.
 Repo: https://github.com/foxyforge/openclaw-rechte – feedback welcome, happy to adapt it if the project wants it in a different shape.

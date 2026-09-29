@@ -57,9 +57,9 @@ test('Tasten schalten zur nächsten Stufe und führen einen sicheren /rechte-Bef
   const tasten = p.blocks.find((b) => b.type === 'buttons').buttons;
   const read = tasten.find((b) => b.label.endsWith(' read'));
   assert.equal(read.label, '🟡 read');
-  assert.deepEqual(read.action, { type: 'command', command: '/rechte telegram read aus' });
-  assert.equal(tasten.find((b) => b.label.endsWith(' exec')).action.command, '/rechte telegram exec nachfragen');
-  for (const b of tasten) assert.match(b.action.command, /^\/rechte [\w*.:-]+ [\w.:-]+ (frei|nachfragen|aus)$/);
+  assert.deepEqual(read.action, { type: 'command', command: '/rechte telegram read weiter' });
+  assert.equal(read.reusable, true);
+  for (const b of tasten) assert.match(b.action.command, /^\/rechte [\w*.:-]+ [\w.:-]+ weiter$/);
   const ansichten = p.blocks.at(-1).buttons.map((b) => b.label);
   assert.deepEqual(ansichten, ['● telegram', 'Alle Kanäle']);
   assert.equal(R.naechste('aus'), 'frei');
@@ -74,4 +74,15 @@ test('Befehl mit Kanal, „zeige“ und Rückmeldung mit neuer Übersicht', () =
   assert.equal(z.kanal, '*');
   assert.match(z.text, /Rechte für alle Kanäle/);
   assert.equal(z.neu, undefined);
+});
+
+test('dieselbe Taste mehrmals gedrückt schaltet reihum: aus → frei → nachfragen → aus', () => {
+  let t = R.setzen(R.leer(), 'telegram', 'read', 'aus');
+  const folge = [];
+  for (let i = 0; i < 3; i += 1) {
+    const r = R.befehl(t, 'telegram', 'telegram read weiter');
+    t = r.neu;
+    folge.push(R.stufe(t, 'telegram', 'read'));
+  }
+  assert.deepEqual(folge, ['frei', 'nachfragen', 'aus']);
 });

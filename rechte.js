@@ -138,7 +138,9 @@ export function uebersicht(tabelle, kanal) {
 export function praesentation(tabelle, kanal, aktuellerKanal) {
   const tasten = werkzeugliste(tabelle, kanal).map((n) => {
     const s = stufe(tabelle, kanal, n);
-    return { label: `${ZEICHEN[s]} ${n}`, action: { type: 'command', command: `/rechte ${kanal} ${n} ${naechste(s)}` }, reusable: true };
+    // „weiter“ statt fester Zielstufe: Das Programm rechnet beim Drücken vom aktuellen Stand aus – so schaltet
+    // dieselbe Taste bei jedem Druck eine Stufe weiter, auch wenn ihre Beschriftung inzwischen veraltet ist.
+    return { label: `${ZEICHEN[s]} ${n}`, action: { type: 'command', command: `/rechte ${kanal} ${n} weiter` }, reusable: true };
   });
   const ansichten = [...new Set([aktuellerKanal, ALLE_KANAELE])].map((k) => ({
     label: `${k === kanal ? '● ' : ''}${k === ALLE_KANAELE ? 'Alle Kanäle' : k}`,
@@ -158,7 +160,7 @@ export function praesentation(tabelle, kanal, aktuellerKanal) {
 // /rechte                               → Übersicht des aktuellen Kanals
 // /rechte zeige <kanal|*>               → Übersicht eines anderen Kanals
 // /rechte <werkzeug> <stufe>            → im aktuellen Kanal setzen
-// /rechte <kanal|*> <werkzeug> <stufe>  → in einem bestimmten Kanal setzen
+// /rechte <kanal|*> <werkzeug> <stufe>  → in einem bestimmten Kanal setzen (Stufe „weiter“ = nächste Stufe)
 // Rückgabe: { kanal (angezeigt), text, neu? (geänderte Tabelle) }
 export function befehl(tabelle, kanal, args) {
   const teile = String(args ?? '').trim().split(/\s+/).filter(Boolean);
@@ -171,6 +173,7 @@ export function befehl(tabelle, kanal, args) {
   if (!neu) return { kanal, text: 'So geht\'s: /rechte <werkzeug> <frei|nachfragen|aus> – zum Beispiel /rechte exec nachfragen' };
   neu = neu.toLowerCase();
   const alt = stufe(tabelle, zielKanal, werkzeug);
+  if (neu === 'weiter') neu = naechste(alt);   // Taste: eine Stufe weiter
   const neueTabelle = setzen(tabelle, zielKanal, werkzeug, neu);
   return {
     kanal: zielKanal,

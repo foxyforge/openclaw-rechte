@@ -102,8 +102,10 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 
 - Buttons are built for and verified on **Telegram**. Other channels get the table as text and switch with
   `/rights <tool> <level>`; the button presentation should render elsewhere too, but that is untested.
-- "ask" needs a channel that can show approvals. From the CLI (`openclaw agent`) such a call aborts with a
-  message – safe, but without the question.
+- "ask" needs a channel that can show approvals. From the CLI (`openclaw agent`) and in runs with nobody to ask
+  (heartbeat, automations) such a call aborts with a message – safe, but without the question. The model then
+  sees a tool error and, depending on the model, may reply oddly; if you use heartbeats, keep the tools they need
+  on "allow" or disable the heartbeat (`heartbeat.every: "0m"`).
 - Identifiers in the code (files, functions, table fields) are German; the visible strings are bilingual. Renaming
   is mechanical if the project wants it.
 

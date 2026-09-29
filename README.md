@@ -105,8 +105,10 @@ erlaubt.
 - Tasten sind für **Telegram** gebaut und dort geprüft. Andere Kanäle bekommen die Tabelle als Text und schalten
   per `/rights <werkzeug> <stufe>`; die Tasten-Anzeige (`presentation`) sollte auch anderswo erscheinen, ist
   aber nicht getestet.
-- „nachfragen“ braucht einen Kanal, der Freigaben anzeigen kann. Über die Kommandozeile (`openclaw agent`) bricht
-  ein solcher Aufruf mit Hinweis ab – sicher, aber ohne Frage.
+- „nachfragen“ braucht einen Kanal, der Freigaben anzeigen kann. Über die Kommandozeile (`openclaw agent`) und in
+  Läufen ohne Gegenüber (Heartbeat, Automationen) bricht ein solcher Aufruf mit Hinweis ab – sicher, aber ohne
+  Frage. Das Modell bekommt dann einen Werkzeugfehler und antwortet je nach Modell merkwürdig; wer Heartbeats nutzt,
+  sollte die dort nötigen Werkzeuge auf „frei“ lassen oder den Heartbeat abschalten (`heartbeat.every: "0m"`).
 - Die Namen im Code (Dateien, Funktionen, Felder der Tabelle) sind deutsch. Die sichtbaren Texte sind zweisprachig.
 
 ## Aufbau und Tests

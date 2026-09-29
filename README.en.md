@@ -114,6 +114,19 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 - Identifiers in the code (files, functions, table fields) are German; the visible strings are bilingual. Renaming
   is mechanical if the project wants it.
 
+## Permissions, secrets, verification (for ClawHub)
+
+- **What the plugin touches:** one file in the OpenClaw state directory (`<state-dir>/rechte/tabelle.json`), nothing else.
+  No network, no external services, no dependencies.
+- **Extension points:** `before_tool_call` (priority 100), `registerInteractiveHandler` (Telegram, namespace `rechte`),
+  `registerCommand` (`rights`, `rechte`).
+- **Secrets:** none. The only setting is `language` (`en`/`de`).
+- **Updating:** install the new version (or `git pull` the folder) and restart the gateway. The table is kept; older tables
+  with German level names are translated on load.
+- **Smoke test without a gateway:** `npm test` (13 tests, Node only).
+- **Smoke test on a live gateway (Telegram):** `/rights read off`, then ask the bot to read a file → it reports the block and
+  does not read. `/rights read ask` → approval card, after "Allow" it reads. `/rights read allow` → reads without asking.
+
 ## Layout and tests
 
 - `rechte.js` – all the logic, no OpenClaw dependency (table, decision, command, buttons, texts en/de).

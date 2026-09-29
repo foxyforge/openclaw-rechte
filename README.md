@@ -116,6 +116,19 @@ erlaubt.
   sollte die dort nötigen Werkzeuge auf „frei“ lassen oder den Heartbeat abschalten (`heartbeat.every: "0m"`).
 - Die Namen im Code (Dateien, Funktionen, Felder der Tabelle) sind deutsch. Die sichtbaren Texte sind zweisprachig.
 
+## Berechtigungen, Geheimnisse, Prüfung (für ClawHub)
+
+- **Was die Erweiterung anfasst:** eine Datei im OpenClaw-Zustandsordner (`<state-dir>/rechte/tabelle.json`), sonst nichts.
+  Kein Netz, keine externen Dienste, keine Abhängigkeiten.
+- **Anschlussstellen:** `before_tool_call` (Priorität 100), `registerInteractiveHandler` (Telegram, Namensraum `rechte`),
+  `registerCommand` (`rights`, `rechte`).
+- **Geheimnisse:** keine. Einzige Einstellung: `language` (`en`/`de`).
+- **Aktualisieren:** neue Version installieren (bzw. Ordner per `git pull` holen), Gateway neu starten. Die Tabelle bleibt
+  erhalten; ältere Tabellen mit deutschen Stufen werden beim Laden übersetzt.
+- **Prüfung ohne Gateway:** `npm test` (13 Tests, nur Node).
+- **Prüfung am lebenden Gateway (Telegram):** `/rights read off`, dann den Bot bitten, eine Datei zu lesen → er meldet die
+  Sperre und liest nicht. `/rights read ask` → Freigabe-Karte, nach „Erlauben“ liest er. `/rights read allow` → liest ohne Frage.
+
 ## Aufbau und Tests
 
 - `rechte.js` – die ganze Logik, ohne OpenClaw-Abhängigkeit (Tabelle, Entscheidung, Befehl, Tasten, Texte de/en).

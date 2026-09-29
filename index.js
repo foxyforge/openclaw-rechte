@@ -6,9 +6,11 @@ import * as R from './rechte.js';
 export default definePluginEntry({
   id: 'rechte',
   name: 'Rechte',
-  description: 'Rechte-Tabelle: je Kanal und Werkzeug frei, nachfragen oder aus. Umschalten mit /rechte.',
+  description: 'Rights table: per channel and tool allow, ask or off. Switch with /rights (alias /rechte).',
   register(api) {
     const datei = join(api.runtime.state.resolveStateDir(), 'rechte', 'tabelle.json');
+    R.spracheSetzen(api.pluginConfig?.language);   // 'de' oder 'en' (Standard); nur die sichtbaren Texte
+    const T = R.texte();
 
     api.on('before_tool_call', (event, ctx) => {
       const werkzeug = event?.toolName ?? event?.name;
@@ -17,13 +19,13 @@ export default definePluginEntry({
       try {
         tabelle = R.laden(datei);
       } catch (fehler) {
-        return { block: true, blockReason: `Rechte-Tabelle nicht lesbar (${fehler.message}) – zur Sicherheit gesperrt.` };
+        return { block: true, blockReason: T.tabelleUnlesbar(fehler.message) };
       }
-      if (!tabelle.bekannt.includes(werkzeug)) {   // neue Werkzeuge merken, damit /rechte sie zeigt
+      if (!tabelle.bekannt.includes(werkzeug)) {   // neue Werkzeuge merken, damit die Tabelle sie zeigt
         tabelle.bekannt.push(werkzeug);
         try { R.speichern(datei, tabelle); } catch (fehler) { api.logger?.warn?.(`rechte: ${fehler.message}`); }
       }
-      return R.entscheiden(tabelle, ctx?.requester?.channel ?? 'unbekannt', werkzeug, event?.params);
+      return R.entscheiden(tabelle, ctx?.requester?.channel ?? 'unknown', werkzeug, event?.params);
     }, { priority: 100 });
 
     // Tastendruck in Telegram: kommt direkt hierher (nicht ans Modell) und ändert dieselbe Nachricht.
@@ -40,33 +42,31 @@ export default definePluginEntry({
           const tabelle = ergebnis.neu ?? R.laden(datei);
           await ctx.respond.editMessage({ text: ergebnis.text, buttons: R.telegramTasten(tabelle, ergebnis.kanal, 'telegram') });
         } catch (fehler) {
-          await ctx.respond.reply({ text: `Nicht geändert: ${fehler.message}` });
+          await ctx.respond.reply({ text: T.nichtGeaendert(fehler.message) });
         }
         return { handled: true };
       },
     });
 
-    api.registerCommand({
-      name: 'rechte',
-      description: 'Rechte je Werkzeug: Tabelle mit Tasten (tippen schaltet weiter) · /rechte <werkzeug> <frei|nachfragen|aus>',
-      acceptsArgs: true,
-      requireAuth: true,
-      handler: async (ctx) => {
-        if (ctx.senderIsOwner === false) return { text: 'Nur der Besitzer darf die Rechte ändern.' };
-        try {
-          const kanal = ctx.channel ?? 'unbekannt';
-          const ergebnis = R.befehl(R.laden(datei), kanal, ctx.args);
-          if (ergebnis.neu) R.speichern(datei, ergebnis.neu);
-          // Text für Kanäle ohne Tasten, Tasten für alle anderen (OpenClaw wählt je Kanal).
-          return {
-            text: ergebnis.text,
-            presentation: R.praesentation(ergebnis.neu ?? R.laden(datei), ergebnis.kanal, kanal),
-            presentationTextMode: 'fallback',
-          };
-        } catch (fehler) {
-          return { text: `Nicht geändert: ${fehler.message}` };
-        }
-      },
-    });
+    // /rights ist der Hauptbefehl, /rechte der deutsche Alias – beide tun dasselbe.
+    const befehl = async (ctx) => {
+      if (ctx.senderIsOwner === false) return { text: T.nurBesitzer };
+      try {
+        const kanal = ctx.channel ?? 'unknown';
+        const ergebnis = R.befehl(R.laden(datei), kanal, ctx.args);
+        if (ergebnis.neu) R.speichern(datei, ergebnis.neu);
+        // Text für Kanäle ohne Tasten, Tasten für alle anderen (OpenClaw wählt je Kanal).
+        return {
+          text: ergebnis.text,
+          presentation: R.praesentation(ergebnis.neu ?? R.laden(datei), ergebnis.kanal, kanal),
+          presentationTextMode: 'fallback',
+        };
+      } catch (fehler) {
+        return { text: T.nichtGeaendert(fehler.message) };
+      }
+    };
+    for (const name of ['rights', 'rechte']) {
+      api.registerCommand({ name, description: T.befehlBeschreibung, acceptsArgs: true, requireAuth: true, handler: befehl });
+    }
   },
 });

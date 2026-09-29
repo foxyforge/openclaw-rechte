@@ -1,41 +1,130 @@
-// Rechte-Tabelle für OpenClaw: je Kanal und Werkzeug eine von drei Stufen – frei, nachfragen, aus.
+// Rechte-Tabelle für OpenClaw: je Kanal und Werkzeug eine von drei Stufen – allow (frei), ask (nachfragen), off (aus).
 //
-// Die Prüfung sitzt im Programm (Eingriffspunkt before_tool_call), nicht im Prompt: Was „aus“ ist, führt
-// OpenClaw nicht aus – egal, was das Modell will. „nachfragen“ nutzt OpenClaws eigene Freigabe (Tasten im
-// Chat oder /approve). Vorbild ist der Agent „Foxy“ (github.com/foxyforge, privat), dort seit Monaten im Alltag.
+// Die Prüfung sitzt im Programm (Eingriffspunkt before_tool_call), nicht im Prompt: Was „off“ ist, führt
+// OpenClaw nicht aus – egal, was das Modell will. „ask“ nutzt OpenClaws eigene Freigabe (Tasten im Chat oder
+// /approve). Vorbild ist der Agent „Foxy“ (github.com/foxyforge, privat), dort seit Monaten im Alltag.
 //
+// Gespeichert und intern gerechnet wird englisch (allow/ask/off). Eingaben gehen deutsch oder englisch
+// (frei/nachfragen/aus, next/weiter); die sichtbaren Texte richten sich nach spracheSetzen('de'|'en').
 // Diese Datei hat keine Abhängigkeit von OpenClaw, damit sie sich ohne Gateway testen lässt (node --test).
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-export const STUFEN = ['frei', 'nachfragen', 'aus'];
-export const ZEICHEN = { frei: '🟢', nachfragen: '🟡', aus: '🔴' };
+export const STUFEN = ['allow', 'ask', 'off'];
+export const ZEICHEN = { allow: '🟢', ask: '🟡', off: '🔴' };
 export const ALLE_KANAELE = '*';
 
-// Wer nichts einstellt, merkt keinen Unterschied: Standard ist „frei“ – so, wie OpenClaw ohne diese Erweiterung.
-export function leer() {
-  return { standard: 'frei', kanaele: {}, bekannt: [] };
+// Eingabe-Namen → gespeicherte Stufe. „next“/„weiter“ = eine Stufe weiter (nur für Befehl und Taste).
+const STUFEN_NAMEN = {
+  allow: 'allow', frei: 'allow',
+  ask: 'ask', nachfragen: 'ask',
+  off: 'off', aus: 'off',
+  next: 'next', weiter: 'next',
+};
+
+// ---------- Sprache der sichtbaren Texte ----------
+
+const TEXTE = {
+  en: {
+    stufe: { allow: 'allow', ask: 'ask', off: 'off' },
+    befehl: '/rights',
+    alleKanaele: 'all channels',
+    alleKanaeleTaste: 'All channels',
+    kanal: (k) => `channel “${k}”`,
+    titel: (kn) => `Rights for ${kn}`,
+    kopf: (kn, std) => `Rights for ${kn} (default: ${std})`,
+    legende: 'Tap to cycle: 🟢 allow → 🟡 ask → 🔴 off.',
+    hilfe: 'Without buttons: /rights <tool> <allow|ask|off> · all channels: /rights * <tool> <level>',
+    hilfeKurz: 'Usage: /rights <tool> <allow|ask|off> – for example /rights exec ask',
+    gesperrt: (w, k) => `The tool “${w}” is switched off in channel “${k}” (rights table). ` +
+      'Do not try another way. Tell the user they can enable it with /rights.',
+    frage: (w) => `Run ${w}?`,
+    frageKanal: (k) => `Channel ${k}.`,
+    geschwaerzt: '[redacted]',
+    unbekannteTaste: (p) => `Unknown button “${p}”`,
+    stufeFehlt: (s) => `Level “${s}” does not exist – allowed: allow, ask, off`,
+    nameUngueltig: (n) => `Tool name “${n}” is invalid`,
+    standardFehlt: (s) => `Default level “${s}” does not exist`,
+    kanaeleFehlt: '“kanaele” is missing',
+    stufeInKanalFehlt: (s, n, k) => `Level “${s}” for ${n} in ${k} does not exist`,
+    tabelleUnlesbar: (m) => `Rights table unreadable (${m}) – locked for safety.`,
+    nurBesitzer: 'Only the owner may change the rights.',
+    nichtGeaendert: (m) => `Not changed: ${m}`,
+    befehlBeschreibung: 'Rights per tool: table with buttons (tap to cycle) · /rights <tool> <allow|ask|off>',
+  },
+  de: {
+    stufe: { allow: 'frei', ask: 'nachfragen', off: 'aus' },
+    befehl: '/rechte',
+    alleKanaele: 'alle Kanäle',
+    alleKanaeleTaste: 'Alle Kanäle',
+    kanal: (k) => `Kanal „${k}“`,
+    titel: (kn) => `Rechte für ${kn}`,
+    kopf: (kn, std) => `Rechte für ${kn} (Standard: ${std})`,
+    legende: 'Tippen schaltet weiter: 🟢 frei → 🟡 nachfragen → 🔴 aus.',
+    hilfe: 'Ohne Tasten: /rechte <werkzeug> <frei|nachfragen|aus> · alle Kanäle: /rechte * <werkzeug> <stufe>',
+    hilfeKurz: 'So geht\'s: /rechte <werkzeug> <frei|nachfragen|aus> – zum Beispiel /rechte exec nachfragen',
+    gesperrt: (w, k) => `Das Werkzeug „${w}“ ist im Kanal „${k}“ ausgeschaltet (Rechte-Tabelle). ` +
+      'Versuche es nicht auf anderem Weg. Sag dem Nutzer, dass er es mit /rechte freischalten kann.',
+    frage: (w) => `${w} ausführen?`,
+    frageKanal: (k) => `Kanal ${k}.`,
+    geschwaerzt: '[geschwärzt]',
+    unbekannteTaste: (p) => `Unbekannte Taste „${p}“`,
+    stufeFehlt: (s) => `Stufe „${s}“ gibt es nicht – erlaubt: frei, nachfragen, aus`,
+    nameUngueltig: (n) => `Werkzeugname „${n}“ ist ungültig`,
+    standardFehlt: (s) => `Standard-Stufe „${s}“ gibt es nicht`,
+    kanaeleFehlt: '„kanaele“ fehlt',
+    stufeInKanalFehlt: (s, n, k) => `Stufe „${s}“ für ${n} in ${k} gibt es nicht`,
+    tabelleUnlesbar: (m) => `Rechte-Tabelle nicht lesbar (${m}) – zur Sicherheit gesperrt.`,
+    nurBesitzer: 'Nur der Besitzer darf die Rechte ändern.',
+    nichtGeaendert: (m) => `Nicht geändert: ${m}`,
+    befehlBeschreibung: 'Rechte je Werkzeug: Tabelle mit Tasten (tippen schaltet weiter) · /rechte <werkzeug> <frei|nachfragen|aus>',
+  },
+};
+
+let T = TEXTE.en;
+
+export function spracheSetzen(sprache) {
+  T = TEXTE[sprache] ?? TEXTE.en;
+  return T === TEXTE.de ? 'de' : 'en';
 }
 
-// Häufige OpenClaw-Werkzeuge, damit /rechte schon vor dem ersten Aufruf etwas zeigt. Weitere kommen dazu,
+export function texte() {
+  return T;
+}
+
+// Wer nichts einstellt, merkt keinen Unterschied: Standard ist „allow“ – so, wie OpenClaw ohne diese Erweiterung.
+export function leer() {
+  return { standard: 'allow', kanaele: {}, bekannt: [] };
+}
+
+// Häufige OpenClaw-Werkzeuge, damit die Tabelle schon vor dem ersten Aufruf etwas zeigt. Weitere kommen dazu,
 // sobald das Modell sie zum ersten Mal benutzt (Liste „bekannt“).
 export const GRUNDLISTE = ['exec', 'process', 'read', 'write', 'edit', 'apply_patch', 'browser', 'web_fetch',
   'web_search', 'message', 'cron', 'gateway', 'sessions_spawn', 'sessions_send'];
 
-function istStufe(wert) {
-  return STUFEN.includes(wert);
+// Deutsch oder englisch → gespeicherte Stufe; undefined, wenn es die Stufe nicht gibt.
+export function stufeName(wert) {
+  const s = STUFEN_NAMEN[String(wert ?? '').toLowerCase()];
+  return s && s !== 'next' ? s : undefined;
 }
 
 export function pruefen(roh) {
   const t = { ...leer(), ...(roh && typeof roh === 'object' ? roh : {}) };
-  if (!istStufe(t.standard)) throw new Error(`Standard-Stufe „${t.standard}“ gibt es nicht (${STUFEN.join(', ')})`);
-  if (typeof t.kanaele !== 'object' || t.kanaele === null || Array.isArray(t.kanaele)) throw new Error('„kanaele“ fehlt');
+  const standard = stufeName(t.standard);
+  if (!standard) throw new Error(T.standardFehlt(t.standard));
+  t.standard = standard;
+  if (typeof t.kanaele !== 'object' || t.kanaele === null || Array.isArray(t.kanaele)) throw new Error(T.kanaeleFehlt);
+  const kanaele = {};
   for (const [kanal, werkzeuge] of Object.entries(t.kanaele)) {
+    kanaele[kanal] = {};
     for (const [name, stufe] of Object.entries(werkzeuge ?? {})) {
-      if (!istStufe(stufe)) throw new Error(`Stufe „${stufe}“ für ${name} in ${kanal} gibt es nicht`);
+      const s = stufeName(stufe);   // alte Tabellen (frei/nachfragen/aus) werden beim Laden übersetzt
+      if (!s) throw new Error(T.stufeInKanalFehlt(stufe, name, kanal));
+      kanaele[kanal][name] = s;
     }
   }
+  t.kanaele = kanaele;
   t.bekannt = Array.isArray(t.bekannt) ? [...new Set(t.bekannt.filter((x) => typeof x === 'string'))] : [];
   return t;
 }
@@ -68,10 +157,11 @@ export function stufe(tabelle, kanal, werkzeug) {
 }
 
 export function setzen(tabelle, kanal, werkzeug, neu) {
-  if (!istStufe(neu)) throw new Error(`Stufe „${neu}“ gibt es nicht – erlaubt: ${STUFEN.join(', ')}`);
-  if (!werkzeug || !/^[\w.:-]{1,64}$/.test(werkzeug)) throw new Error(`Werkzeugname „${werkzeug}“ ist ungültig`);
+  const s = stufeName(neu);
+  if (!s) throw new Error(T.stufeFehlt(neu));
+  if (!werkzeug || !/^[\w.:-]{1,64}$/.test(werkzeug)) throw new Error(T.nameUngueltig(werkzeug));
   const t = pruefen(structuredClone(tabelle));
-  t.kanaele[kanal] = { ...(t.kanaele[kanal] ?? {}), [werkzeug]: neu };
+  t.kanaele[kanal] = { ...(t.kanaele[kanal] ?? {}), [werkzeug]: s };
   return t;
 }
 
@@ -82,7 +172,7 @@ export function kurzfassung(params) {
   const teile = [];
   for (const [schluessel, wert] of Object.entries(params)) {
     let text = typeof wert === 'string' ? wert : JSON.stringify(wert);
-    if (GEHEIM.test(schluessel)) text = '[geschwärzt]';
+    if (GEHEIM.test(schluessel)) text = T.geschwaerzt;
     text = String(text ?? '').replace(/\s+/g, ' ');
     teile.push(`${schluessel}: ${text.length > 80 ? `${text.slice(0, 80)}…` : text}`);
   }
@@ -93,24 +183,20 @@ export function kurzfassung(params) {
 // Die eigentliche Entscheidung für before_tool_call. Rückgabe im Format von OpenClaw.
 export function entscheiden(tabelle, kanal, werkzeug, params) {
   const s = stufe(tabelle, kanal, werkzeug);
-  if (s === 'aus') {
-    return {
-      block: true,
-      blockReason: `Das Werkzeug „${werkzeug}“ ist im Kanal „${kanal}“ ausgeschaltet (Rechte-Tabelle). ` +
-        'Versuche es nicht auf anderem Weg. Sag dem Nutzer, dass er es mit /rechte freischalten kann.',
-    };
+  if (s === 'off') {
+    return { block: true, blockReason: T.gesperrt(werkzeug, kanal) };
   }
-  if (s === 'nachfragen') {
+  if (s === 'ask') {
     return {
       requireApproval: {
-        title: `${werkzeug} ausführen?`.slice(0, 80),
-        description: (`Kanal ${kanal}. ${kurzfassung(params)}`).slice(0, 512),
+        title: T.frage(werkzeug).slice(0, 80),
+        description: (`${T.frageKanal(kanal)} ${kurzfassung(params)}`).slice(0, 512),
         severity: 'warning',
         allowedDecisions: ['allow-once', 'deny'],   // „immer erlauben“ ginge an der Tabelle vorbei
       },
     };
   }
-  return undefined;   // frei: keine Entscheidung, OpenClaw macht normal weiter
+  return undefined;   // allow: keine Entscheidung, OpenClaw macht normal weiter
 }
 
 // Nur der Besitzer schaltet um. ownerAllowFrom ist OpenClaws Besitzerliste (z. B. "telegram:123"); ist sie leer,
@@ -131,14 +217,16 @@ function werkzeugliste(tabelle, kanal) {
 }
 
 function kanalname(kanal) {
-  return kanal === ALLE_KANAELE ? 'alle Kanäle' : `Kanal „${kanal}“`;
+  return kanal === ALLE_KANAELE ? T.alleKanaele : T.kanal(kanal);
+}
+
+function stufeText(s) {
+  return `${ZEICHEN[s]} ${T.stufe[s]}`;
 }
 
 export function uebersicht(tabelle, kanal) {
   const zeilen = werkzeugliste(tabelle, kanal).map((n) => `${ZEICHEN[stufe(tabelle, kanal, n)]} ${n}`);
-  return `Rechte für ${kanalname(kanal)} (Standard: ${ZEICHEN[tabelle.standard]} ${tabelle.standard})\n${zeilen.join('\n')}\n\n` +
-    'Tippen schaltet weiter: 🟢 frei → 🟡 nachfragen → 🔴 aus. ' +
-    'Ohne Tasten: /rechte <werkzeug> <frei|nachfragen|aus> · alle Kanäle: /rechte * <werkzeug> <stufe>';
+  return `${T.kopf(kanalname(kanal), stufeText(tabelle.standard))}\n${zeilen.join('\n')}\n\n${T.legende} ${T.hilfe}`;
 }
 
 // Tasten: Jede trägt „rechte:…“. OpenClaw leitet den Druck direkt an diese Erweiterung (registerInteractiveHandler,
@@ -153,20 +241,20 @@ function tastenListe(tabelle, kanal, aktuellerKanal) {
     daten: `${NAMENSRAUM}:w:${kanal}:${n}`,
   }));
   const ansichten = [...new Set([aktuellerKanal, ALLE_KANAELE])].map((k) => ({
-    text: `${k === kanal ? '● ' : ''}${k === ALLE_KANAELE ? 'Alle Kanäle' : k}`,
+    text: `${k === kanal ? '● ' : ''}${k === ALLE_KANAELE ? T.alleKanaeleTaste : k}`,
     daten: `${NAMENSRAUM}:z:${k}`,
   }));
   return { werkzeuge, ansichten };
 }
 
-// Für die Antwort auf /rechte (OpenClaw baut daraus die Tasten des jeweiligen Kanals).
+// Für die Antwort auf /rights (OpenClaw baut daraus die Tasten des jeweiligen Kanals).
 export function praesentation(tabelle, kanal, aktuellerKanal) {
   const { werkzeuge, ansichten } = tastenListe(tabelle, kanal, aktuellerKanal);
   const taste = (b) => ({ label: b.text, value: b.daten });   // roher Rückrufwert → landet im Namensraum „rechte“
   return {
-    title: `Rechte für ${kanalname(kanal)}`,
+    title: T.titel(kanalname(kanal)),
     blocks: [
-      { type: 'text', text: `Tippen schaltet weiter: 🟢 frei → 🟡 nachfragen → 🔴 aus (Standard: ${tabelle.standard}).` },
+      { type: 'text', text: `${T.legende} (${T.stufe[tabelle.standard]})` },
       { type: 'buttons', buttons: werkzeuge.map(taste) },
       { type: 'buttons', buttons: ansichten.map(taste) },
     ],
@@ -188,31 +276,31 @@ export function telegramTasten(tabelle, kanal, aktuellerKanal) {
 export function taste(tabelle, payload) {
   const [art, kanal, werkzeug] = String(payload ?? '').split(':');
   if (art === 'z' && kanal) return { kanal, text: uebersicht(tabelle, kanal) };
-  if (art === 'w' && kanal && werkzeug) return befehl(tabelle, kanal, `${kanal} ${werkzeug} weiter`);
-  throw new Error(`Unbekannte Taste „${payload}“`);
+  if (art === 'w' && kanal && werkzeug) return befehl(tabelle, kanal, `${kanal} ${werkzeug} next`);
+  throw new Error(T.unbekannteTaste(payload));
 }
 
-// /rechte                               → Übersicht des aktuellen Kanals
-// /rechte zeige <kanal|*>               → Übersicht eines anderen Kanals
-// /rechte <werkzeug> <stufe>            → im aktuellen Kanal setzen
-// /rechte <kanal|*> <werkzeug> <stufe>  → in einem bestimmten Kanal setzen (Stufe „weiter“ = nächste Stufe)
-// Rückgabe: { kanal (angezeigt), text, neu? (geänderte Tabelle) }
+// /rights                               → Übersicht des aktuellen Kanals
+// /rights show <kanal|*>                → Übersicht eines anderen Kanals (deutsch: zeige)
+// /rights <werkzeug> <stufe>            → im aktuellen Kanal setzen
+// /rights <kanal|*> <werkzeug> <stufe>  → in einem bestimmten Kanal setzen (Stufe „next“/„weiter“ = nächste Stufe)
+// Stufen deutsch oder englisch. Rückgabe: { kanal (angezeigt), text, neu? (geänderte Tabelle) }
 export function befehl(tabelle, kanal, args) {
   const teile = String(args ?? '').trim().split(/\s+/).filter(Boolean);
   if (teile.length === 0) return { kanal, text: uebersicht(tabelle, kanal) };
-  if (teile[0].toLowerCase() === 'zeige') {
+  if (['show', 'zeige'].includes(teile[0].toLowerCase())) {
     const ziel = teile[1] ?? kanal;
     return { kanal: ziel, text: uebersicht(tabelle, ziel) };
   }
-  let [zielKanal, werkzeug, neu] = teile.length >= 3 ? teile : [kanal, ...teile];
-  if (!neu) return { kanal, text: 'So geht\'s: /rechte <werkzeug> <frei|nachfragen|aus> – zum Beispiel /rechte exec nachfragen' };
-  neu = neu.toLowerCase();
+  const [zielKanal, werkzeug, gewuenscht] = teile.length >= 3 ? teile : [kanal, ...teile];
+  if (!gewuenscht) return { kanal, text: T.hilfeKurz };
   const alt = stufe(tabelle, zielKanal, werkzeug);
-  if (neu === 'weiter') neu = naechste(alt);   // Taste: eine Stufe weiter
+  const neu = STUFEN_NAMEN[gewuenscht.toLowerCase()] === 'next' ? naechste(alt) : gewuenscht;   // Taste: eine Stufe weiter
   const neueTabelle = setzen(tabelle, zielKanal, werkzeug, neu);
+  const jetzt = stufe(neueTabelle, zielKanal, werkzeug);
   return {
     kanal: zielKanal,
-    text: `${werkzeug}: ${ZEICHEN[alt]} ${alt} → ${ZEICHEN[neu]} ${neu} (${kanalname(zielKanal)})\n\n${uebersicht(neueTabelle, zielKanal)}`,
+    text: `${werkzeug}: ${stufeText(alt)} → ${stufeText(jetzt)} (${kanalname(zielKanal)})\n\n${uebersicht(neueTabelle, zielKanal)}`,
     neu: neueTabelle,
   };
 }

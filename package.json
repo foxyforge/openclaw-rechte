@@ -1,7 +1,7 @@
 {
   "name": "openclaw-rechte",
-  "version": "0.3.0",
-  "description": "Rechte-Tabelle für OpenClaw: je Kanal und Werkzeug frei, nachfragen oder aus – geprüft im Programm, nicht im Prompt.",
+  "version": "0.4.0",
+  "description": "Rights table for OpenClaw: per channel and tool allow, ask or off – enforced in code, not in the prompt. /rights (alias /rechte).",
   "private": true,
   "type": "module",
   "license": "MIT",

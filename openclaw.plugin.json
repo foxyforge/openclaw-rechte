@@ -1,7 +1,18 @@
 {
   "id": "rechte",
   "name": "Rechte",
-  "description": "Rechte-Tabelle: je Kanal und Werkzeug frei, nachfragen oder aus. Umschalten mit /rechte.",
+  "description": "Rights table: per channel and tool allow, ask or off. Switch with /rights (alias /rechte).",
   "activation": { "onStartup": true },
-  "configSchema": { "type": "object", "additionalProperties": false }
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "language": {
+        "type": "string",
+        "enum": ["en", "de"],
+        "default": "en",
+        "description": "Language of the visible texts (table, buttons, messages). Commands and level names are accepted in both languages regardless."
+      }
+    }
+  }
 }

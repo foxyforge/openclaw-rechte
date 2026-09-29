@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import * as R from '../rechte.js';
 
+R.spracheSetzen('de');   // die meisten Tests prüfen die deutschen Texte; ein Test schaltet um
+
 test('ohne Einstellung ist alles frei – niemand verliert etwas', () => {
   assert.equal(R.entscheiden(R.leer(), 'telegram', 'exec', {}), undefined);
 });
@@ -21,6 +23,21 @@ test('aus blockiert mit Begründung, nachfragen fragt, Kanal gewinnt vor „alle
   assert.equal(R.entscheiden(t, 'webchat', 'read', {}), undefined);
 });
 
+test('Stufen gehen deutsch und englisch, gespeichert wird englisch', () => {
+  const t = R.setzen(R.setzen(R.leer(), 'telegram', 'exec', 'aus'), 'telegram', 'read', 'ask');
+  assert.equal(R.stufe(t, 'telegram', 'exec'), 'off');
+  assert.equal(R.stufe(t, 'telegram', 'read'), 'ask');
+  assert.equal(R.stufe(R.befehl(t, 'telegram', 'write ALLOW').neu, 'telegram', 'write'), 'allow');
+  assert.throws(() => R.setzen(t, 'telegram', 'exec', 'next'), /gibt es nicht/);   // „weiter“ nur per Befehl/Taste
+});
+
+test('alte Tabelle mit deutschen Stufen wird beim Laden übersetzt', () => {
+  const alt = R.pruefen({ standard: 'frei', kanaele: { telegram: { exec: 'aus', read: 'nachfragen' } } });
+  assert.equal(alt.standard, 'allow');
+  assert.deepEqual(alt.kanaele.telegram, { exec: 'off', read: 'ask' });
+  assert.throws(() => R.pruefen({ standard: 'allow', kanaele: { telegram: { exec: 'vielleicht' } } }), /gibt es nicht/);
+});
+
 test('Freigabe-Karte schwärzt Geheimnisse und kürzt', () => {
   const text = R.kurzfassung({ apiKey: 'sk-geheim', url: 'https://x.de/' + 'a'.repeat(200) });
   assert.ok(!text.includes('sk-geheim') && text.includes('[geschwärzt]') && text.length <= 401);
@@ -30,12 +47,13 @@ test('/rechte zeigt, ändert und lehnt Unsinn ab', () => {
   const t = R.leer();
   assert.match(R.befehl(t, 'telegram', '').text, /🟢 exec/);
   const r = R.befehl(t, 'telegram', 'exec aus');
-  assert.equal(R.stufe(r.neu, 'telegram', 'exec'), 'aus');
+  assert.equal(R.stufe(r.neu, 'telegram', 'exec'), 'off');
   assert.match(r.text, /exec: 🟢 frei → 🔴 aus/);
   const alle = R.befehl(t, 'telegram', '* web_fetch nachfragen');
-  assert.equal(R.stufe(alle.neu, 'discord', 'web_fetch'), 'nachfragen');
+  assert.equal(R.stufe(alle.neu, 'discord', 'web_fetch'), 'ask');
   assert.throws(() => R.befehl(t, 'telegram', 'exec vielleicht'), /gibt es nicht/);
   assert.throws(() => R.befehl(t, 'telegram', 'ex;ec aus'), /ungültig/);
+  assert.match(R.befehl(t, 'telegram', 'exec').text, /So geht's/);
 });
 
 test('speichern ist atomar, kaputte Datei führt zum Fehler (der Einstieg sperrt dann)', () => {
@@ -43,8 +61,8 @@ test('speichern ist atomar, kaputte Datei führt zum Fehler (der Einstieg sperrt
   const datei = join(ordner, 'tabelle.json');
   assert.deepEqual(R.laden(datei), R.leer());                 // fehlt = leer
   R.speichern(datei, R.setzen(R.leer(), 'telegram', 'exec', 'aus'));
-  assert.equal(R.stufe(R.laden(datei), 'telegram', 'exec'), 'aus');
-  assert.match(readFileSync(datei, 'utf8'), /"aus"/);
+  assert.equal(R.stufe(R.laden(datei), 'telegram', 'exec'), 'off');
+  assert.match(readFileSync(datei, 'utf8'), /"off"/);
   writeFileSync(datei, '{ kaputt');
   assert.throws(() => R.laden(datei));
   writeFileSync(datei, JSON.stringify({ standard: 'vielleicht', kanaele: {} }));
@@ -76,7 +94,7 @@ test('dieselbe Taste mehrmals: nachfragen → aus → frei → nachfragen; Ansic
     t = r.neu;
     folge.push(R.stufe(t, 'telegram', 'read'));
   }
-  assert.deepEqual(folge, ['aus', 'frei', 'nachfragen']);
+  assert.deepEqual(folge, ['off', 'allow', 'ask']);
   const ansicht = R.taste(t, 'z:*');
   assert.equal(ansicht.kanal, '*');
   assert.equal(ansicht.neu, undefined);
@@ -84,15 +102,17 @@ test('dieselbe Taste mehrmals: nachfragen → aus → frei → nachfragen; Ansic
   assert.throws(() => R.taste(t, 'w:telegram:ex;ec'), /ungültig/);
 });
 
-test('Befehl mit Kanal, „zeige“ und Rückmeldung mit neuer Übersicht', () => {
+test('Befehl mit Kanal, „zeige“/„show“ und Rückmeldung mit neuer Übersicht', () => {
   const r = R.befehl(R.leer(), 'telegram', 'telegram read aus');
   assert.equal(r.kanal, 'telegram');
   assert.match(r.text, /read: 🟢 frei → 🔴 aus \(Kanal „telegram“\)/);
   assert.match(r.text, /🔴 read/);
-  const z = R.befehl(r.neu, 'telegram', 'zeige *');
-  assert.equal(z.kanal, '*');
-  assert.match(z.text, /Rechte für alle Kanäle/);
-  assert.equal(z.neu, undefined);
+  for (const wort of ['zeige', 'show']) {
+    const z = R.befehl(r.neu, 'telegram', `${wort} *`);
+    assert.equal(z.kanal, '*');
+    assert.match(z.text, /Rechte für alle Kanäle/);
+    assert.equal(z.neu, undefined);
+  }
 });
 
 test('umschalten darf nur der Besitzer; ohne Besitzerliste genügt die Zulassung durch OpenClaw', () => {
@@ -102,4 +122,17 @@ test('umschalten darf nur der Besitzer; ohne Besitzerliste genügt die Zulassung
   assert.equal(R.darfSchalten(['telegram:1'], 'telegram', '1', false), false);
   assert.equal(R.darfSchalten([], 'telegram', '9', true), true);
   assert.equal(R.darfSchalten(undefined, 'telegram', '9', false), false);
+});
+
+test('Sprache: englisch ist Standard, Texte wechseln, Eingaben gehen in beiden Sprachen', () => {
+  assert.equal(R.spracheSetzen('xx'), 'en');   // unbekannt → englisch
+  const t = R.setzen(R.leer(), 'telegram', 'exec', 'aus');
+  assert.match(R.uebersicht(t, 'telegram'), /Rights for channel “telegram” \(default: 🟢 allow\)/);
+  assert.match(R.uebersicht(t, '*'), /all channels/);
+  assert.match(R.entscheiden(t, 'telegram', 'exec', {}).blockReason, /switched off .* \/rights/);
+  assert.match(R.befehl(t, 'telegram', 'read nachfragen').text, /read: 🟢 allow → 🟡 ask/);
+  assert.equal(R.praesentation(t, 'telegram', 'telegram').blocks.at(-1).buttons.at(-1).label, 'All channels');
+  assert.throws(() => R.befehl(t, 'telegram', 'exec maybe'), /does not exist/);
+  assert.equal(R.spracheSetzen('de'), 'de');
+  assert.match(R.uebersicht(t, 'telegram'), /Rechte für Kanal „telegram“/);
 });

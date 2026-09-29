@@ -26,6 +26,27 @@ export default definePluginEntry({
       return R.entscheiden(tabelle, ctx?.requester?.channel ?? 'unbekannt', werkzeug, event?.params);
     }, { priority: 100 });
 
+    // Tastendruck in Telegram: kommt direkt hierher (nicht ans Modell) und ändert dieselbe Nachricht.
+    api.registerInteractiveHandler({
+      channel: 'telegram',
+      namespace: R.NAMENSRAUM,
+      handler: async (ctx) => {
+        const besitzer = (api.config?.commands?.ownerAllowFrom ?? []).map(String);
+        if (!ctx.auth?.isAuthorizedSender || (besitzer.length > 0 && !besitzer.includes(`telegram:${ctx.senderId}`))) {
+          return { handled: true };   // Fremde dürfen nichts umschalten – still ignorieren
+        }
+        try {
+          const ergebnis = R.taste(R.laden(datei), ctx.callback?.payload);
+          if (ergebnis.neu) R.speichern(datei, ergebnis.neu);
+          const tabelle = ergebnis.neu ?? R.laden(datei);
+          await ctx.respond.editMessage({ text: ergebnis.text, buttons: R.telegramTasten(tabelle, ergebnis.kanal, 'telegram') });
+        } catch (fehler) {
+          await ctx.respond.reply({ text: `Nicht geändert: ${fehler.message}` });
+        }
+        return { handled: true };
+      },
+    });
+
     api.registerCommand({
       name: 'rechte',
       description: 'Rechte je Werkzeug: Tabelle mit Tasten (tippen schaltet weiter) · /rechte <werkzeug> <frei|nachfragen|aus>',

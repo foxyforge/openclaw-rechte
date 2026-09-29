@@ -133,28 +133,55 @@ export function uebersicht(tabelle, kanal) {
     'Ohne Tasten: /rechte <werkzeug> <frei|nachfragen|aus> · alle Kanäle: /rechte * <werkzeug> <stufe>';
 }
 
-// Tasten für Kanäle, die sie können (Telegram, Discord …): Jede Taste führt einen /rechte-Befehl aus – mit der
-// nächsten Stufe. So muss niemand tippen, und die Handy-Autokorrektur kann nichts verderben.
-export function praesentation(tabelle, kanal, aktuellerKanal) {
-  const tasten = werkzeugliste(tabelle, kanal).map((n) => {
-    const s = stufe(tabelle, kanal, n);
-    // „weiter“ statt fester Zielstufe: Das Programm rechnet beim Drücken vom aktuellen Stand aus – so schaltet
-    // dieselbe Taste bei jedem Druck eine Stufe weiter, auch wenn ihre Beschriftung inzwischen veraltet ist.
-    return { label: `${ZEICHEN[s]} ${n}`, action: { type: 'command', command: `/rechte ${kanal} ${n} weiter` }, reusable: true };
-  });
-  const ansichten = [...new Set([aktuellerKanal, ALLE_KANAELE])].map((k) => ({
-    label: `${k === kanal ? '● ' : ''}${k === ALLE_KANAELE ? 'Alle Kanäle' : k}`,
-    action: { type: 'command', command: `/rechte zeige ${k}` },
-    reusable: true,
+// Tasten: Jede trägt „rechte:…“. OpenClaw leitet den Druck direkt an diese Erweiterung (registerInteractiveHandler,
+// Namensraum „rechte“) – nicht ans Modell. Die Erweiterung ändert dann dieselbe Nachricht (neue Tabelle, neue Tasten).
+//   rechte:w:<kanal>:<werkzeug>  → eine Stufe weiter (vom aktuellen Stand aus gerechnet)
+//   rechte:z:<kanal>             → Tabelle eines Kanals zeigen
+export const NAMENSRAUM = 'rechte';
+
+function tastenListe(tabelle, kanal, aktuellerKanal) {
+  const werkzeuge = werkzeugliste(tabelle, kanal).map((n) => ({
+    text: `${ZEICHEN[stufe(tabelle, kanal, n)]} ${n}`,
+    daten: `${NAMENSRAUM}:w:${kanal}:${n}`,
   }));
+  const ansichten = [...new Set([aktuellerKanal, ALLE_KANAELE])].map((k) => ({
+    text: `${k === kanal ? '● ' : ''}${k === ALLE_KANAELE ? 'Alle Kanäle' : k}`,
+    daten: `${NAMENSRAUM}:z:${k}`,
+  }));
+  return { werkzeuge, ansichten };
+}
+
+// Für die Antwort auf /rechte (OpenClaw baut daraus die Tasten des jeweiligen Kanals).
+export function praesentation(tabelle, kanal, aktuellerKanal) {
+  const { werkzeuge, ansichten } = tastenListe(tabelle, kanal, aktuellerKanal);
+  const taste = (b) => ({ label: b.text, value: b.daten });   // roher Rückrufwert → landet im Namensraum „rechte“
   return {
     title: `Rechte für ${kanalname(kanal)}`,
     blocks: [
       { type: 'text', text: `Tippen schaltet weiter: 🟢 frei → 🟡 nachfragen → 🔴 aus (Standard: ${tabelle.standard}).` },
-      { type: 'buttons', buttons: tasten },
-      { type: 'buttons', buttons: ansichten },
+      { type: 'buttons', buttons: werkzeuge.map(taste) },
+      { type: 'buttons', buttons: ansichten.map(taste) },
     ],
   };
+}
+
+// Für das Ändern der Nachricht nach einem Tastendruck (Telegram: Zeilen zu je zwei Tasten).
+export function telegramTasten(tabelle, kanal, aktuellerKanal) {
+  const { werkzeuge, ansichten } = tastenListe(tabelle, kanal, aktuellerKanal);
+  const zeilen = [];
+  for (let i = 0; i < werkzeuge.length; i += 2) {
+    zeilen.push(werkzeuge.slice(i, i + 2).map((b) => ({ text: b.text, callback_data: b.daten })));
+  }
+  zeilen.push(ansichten.map((b) => ({ text: b.text, callback_data: b.daten })));
+  return zeilen;
+}
+
+// Tastendruck auswerten. payload = alles nach „rechte:“. Rückgabe wie befehl(): { kanal, text, neu? }
+export function taste(tabelle, payload) {
+  const [art, kanal, werkzeug] = String(payload ?? '').split(':');
+  if (art === 'z' && kanal) return { kanal, text: uebersicht(tabelle, kanal) };
+  if (art === 'w' && kanal && werkzeug) return befehl(tabelle, kanal, `${kanal} ${werkzeug} weiter`);
+  throw new Error(`Unbekannte Taste „${payload}“`);
 }
 
 // /rechte                               → Übersicht des aktuellen Kanals

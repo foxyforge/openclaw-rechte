@@ -51,18 +51,37 @@ test('speichern ist atomar, kaputte Datei führt zum Fehler (der Einstieg sperrt
   assert.throws(() => R.laden(datei), /gibt es nicht/);
 });
 
-test('Tasten schalten zur nächsten Stufe und führen einen sicheren /rechte-Befehl aus', () => {
+test('Tasten tragen „rechte:…“ und landen im eigenen Namensraum – nie als Text beim Modell', () => {
   const t = R.setzen(R.leer(), 'telegram', 'read', 'nachfragen');
   const p = R.praesentation(t, 'telegram', 'telegram');
   const tasten = p.blocks.find((b) => b.type === 'buttons').buttons;
   const read = tasten.find((b) => b.label.endsWith(' read'));
-  assert.equal(read.label, '🟡 read');
-  assert.deepEqual(read.action, { type: 'command', command: '/rechte telegram read weiter' });
-  assert.equal(read.reusable, true);
-  for (const b of tasten) assert.match(b.action.command, /^\/rechte [\w*.:-]+ [\w.:-]+ weiter$/);
-  const ansichten = p.blocks.at(-1).buttons.map((b) => b.label);
-  assert.deepEqual(ansichten, ['● telegram', 'Alle Kanäle']);
-  assert.equal(R.naechste('aus'), 'frei');
+  assert.deepEqual(read, { label: '🟡 read', value: 'rechte:w:telegram:read' });
+  for (const b of tasten) {
+    assert.match(b.value, /^rechte:w:[\w*.:-]+:[\w.-]+$/);
+    assert.ok(Buffer.byteLength(b.value) <= 64, 'Telegram erlaubt höchstens 64 Byte');
+  }
+  assert.deepEqual(p.blocks.at(-1).buttons.map((b) => [b.label, b.value]),
+    [['● telegram', 'rechte:z:telegram'], ['Alle Kanäle', 'rechte:z:*']]);
+  const zeilen = R.telegramTasten(t, 'telegram', 'telegram');
+  assert.ok(zeilen.slice(0, -1).every((z) => z.length <= 2));
+  assert.deepEqual(zeilen.flat().find((b) => b.text.endsWith(' read')), { text: '🟡 read', callback_data: 'rechte:w:telegram:read' });
+});
+
+test('dieselbe Taste mehrmals: nachfragen → aus → frei → nachfragen; Ansicht wechseln; Unsinn abgelehnt', () => {
+  let t = R.setzen(R.leer(), 'telegram', 'read', 'nachfragen');
+  const folge = [];
+  for (let i = 0; i < 3; i += 1) {
+    const r = R.taste(t, 'w:telegram:read');
+    t = r.neu;
+    folge.push(R.stufe(t, 'telegram', 'read'));
+  }
+  assert.deepEqual(folge, ['aus', 'frei', 'nachfragen']);
+  const ansicht = R.taste(t, 'z:*');
+  assert.equal(ansicht.kanal, '*');
+  assert.equal(ansicht.neu, undefined);
+  assert.throws(() => R.taste(t, 'x:irgendwas'), /Unbekannte Taste/);
+  assert.throws(() => R.taste(t, 'w:telegram:ex;ec'), /ungültig/);
 });
 
 test('Befehl mit Kanal, „zeige“ und Rückmeldung mit neuer Übersicht', () => {
@@ -74,15 +93,4 @@ test('Befehl mit Kanal, „zeige“ und Rückmeldung mit neuer Übersicht', () =
   assert.equal(z.kanal, '*');
   assert.match(z.text, /Rechte für alle Kanäle/);
   assert.equal(z.neu, undefined);
-});
-
-test('dieselbe Taste mehrmals gedrückt schaltet reihum: aus → frei → nachfragen → aus', () => {
-  let t = R.setzen(R.leer(), 'telegram', 'read', 'aus');
-  const folge = [];
-  for (let i = 0; i < 3; i += 1) {
-    const r = R.befehl(t, 'telegram', 'telegram read weiter');
-    t = r.neu;
-    folge.push(R.stufe(t, 'telegram', 'read'));
-  }
-  assert.deepEqual(folge, ['frei', 'nachfragen', 'aus']);
 });

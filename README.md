@@ -59,11 +59,14 @@ Getestet mit OpenClaw 2026.9.6, Node 24, Telegram-Kanal.
 | `/rechte exec nachfragen` | im aktuellen Kanal setzen |
 | `/rechte * web_fetch aus` | für alle Kanäle setzen |
 | `/rechte zeige discord` | Tabelle eines anderen Kanals ansehen (englisch: `show`) |
+| `/rechte standard nachfragen` | Standard für Werkzeuge **ohne Eintrag** (neue, noch unbekannte Werkzeuge); englisch: `default` |
 
 Alles in Kleinbuchstaben tippen – manche Handys machen aus `/rechte` ein `/Rechte`, und das geht dann ans Modell
 statt an den Befehl.
 
-**Reihenfolge der Prüfung:** Eintrag im Kanal → Eintrag für alle Kanäle (`*`) → Standard (`frei`).
+**Reihenfolge der Prüfung:** Eintrag im Kanal → Eintrag für alle Kanäle (`*`) → Standard (`frei`, umstellbar mit
+`/rechte standard <stufe>`). Wer nur über einen Kanal Anweisungen geben will, stellt den Standard auf „nachfragen“ oder
+„aus“, dann läuft auch ein Werkzeug, das noch in keiner Tabelle steht, nicht einfach durch.
 
 Werkzeuge, die das Modell zum ersten Mal benutzt, kommen automatisch in die Tabelle (Liste `bekannt`), damit man
 sie beim nächsten `/rechte` sieht.
@@ -117,7 +120,7 @@ erlaubt.
 
 - `rechte.js` – die ganze Logik, ohne OpenClaw-Abhängigkeit (Tabelle, Entscheidung, Befehl, Tasten, Texte de/en).
 - `index.js` – der Einstieg für OpenClaw (`before_tool_call`, `/rights` + `/rechte`, Tastendruck-Handler).
-- `test/rechte.test.js` – 12 Tests, `npm test` (nur Node, keine weiteren Pakete).
+- `test/rechte.test.js` – 13 Tests, `npm test` (nur Node, keine weiteren Pakete).
 
 Live geprüft am 29.09.2026 in Telegram: Tabelle anzeigen, alle drei Stufen (frei liest ohne Frage, nachfragen zeigt
 die Freigabe-Tasten und liest nach „Erlauben“, aus wird im Programm abgefangen und dem Nutzer erklärt), Tasten

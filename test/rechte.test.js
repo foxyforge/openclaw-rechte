@@ -136,3 +136,13 @@ test('Sprache: englisch ist Standard, Texte wechseln, Eingaben gehen in beiden S
   assert.equal(R.spracheSetzen('de'), 'de');
   assert.match(R.uebersicht(t, 'telegram'), /Rechte für Kanal „telegram“/);
 });
+
+test('Standard umstellen: gilt für Werkzeuge ohne Eintrag, in beiden Sprachen', () => {
+  const r = R.befehl(R.leer(), 'telegram', 'standard nachfragen');
+  assert.equal(r.neu.standard, 'ask');
+  assert.match(r.text, /Standard \(Werkzeuge ohne Eintrag\): 🟢 frei → 🟡 nachfragen/);
+  assert.deepEqual(R.entscheiden(r.neu, 'discord', 'irgendwas_neues', {}).requireApproval.allowedDecisions, ['allow-once', 'deny']);
+  assert.equal(R.befehl(r.neu, 'telegram', 'default off').neu.standard, 'off');
+  assert.throws(() => R.befehl(R.leer(), 'telegram', 'standard vielleicht'), /gibt es nicht/);
+  assert.equal(R.befehl(R.leer(), 'telegram', 'standard').text.includes('So geht'), true);   // ohne Stufe: Hilfe
+});

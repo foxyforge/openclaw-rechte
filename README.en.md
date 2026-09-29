@@ -59,11 +59,14 @@ Tested with OpenClaw 2026.9.6, Node 24, the Telegram channel.
 | `/rights exec ask` | set in the current channel |
 | `/rights * web_fetch off` | set for all channels |
 | `/rights show discord` | show another channel's table |
+| `/rights default ask` | default for tools **without an entry** (new, still unknown tools); German: `standard` |
 
 Type in lowercase – some phones autocorrect `/rights` to `/Rights`, which then goes to the model instead of
 the command.
 
-**Resolution order:** entry for the channel → entry for all channels (`*`) → default (`allow`).
+**Resolution order:** entry for the channel → entry for all channels (`*`) → default (`allow`, changeable with
+`/rights default <level>`). If you want instructions to come from one channel only, set the default to "ask" or "off",
+so a tool that is not in any table yet does not simply run.
 
 Tools the model uses for the first time are added to the table automatically (list `bekannt`, "known") so they
 show up on the next `/rights`.
@@ -115,7 +118,7 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 
 - `rechte.js` – all the logic, no OpenClaw dependency (table, decision, command, buttons, texts en/de).
 - `index.js` – the OpenClaw entry (`before_tool_call`, `/rights` + `/rechte`, button handler).
-- `test/rechte.test.js` – 12 tests, `npm test` (Node only, no extra packages).
+- `test/rechte.test.js` – 13 tests, `npm test` (Node only, no extra packages).
 
 Verified live on 2026-09-29 in Telegram: show the table; all three levels (allow reads without asking, ask shows
 the approval buttons and reads after "Allow", off is intercepted in code and explained to the user); buttons

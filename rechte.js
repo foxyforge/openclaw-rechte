@@ -35,7 +35,8 @@ const TEXTE = {
     titel: (kn) => `Rights for ${kn}`,
     kopf: (kn, std) => `Rights for ${kn} (default: ${std})`,
     legende: 'Tap to cycle: 🟢 allow → 🟡 ask → 🔴 off.',
-    hilfe: 'Without buttons: /rights <tool> <allow|ask|off> · all channels: /rights * <tool> <level>',
+    hilfe: 'Without buttons: /rights <tool> <allow|ask|off> · all channels: /rights * <tool> <level> · unknown tools: /rights default <level>',
+    standardText: 'Default (tools without an entry)',
     hilfeKurz: 'Usage: /rights <tool> <allow|ask|off> – for example /rights exec ask',
     gesperrt: (w, k) => `The tool “${w}” is switched off in channel “${k}” (rights table). ` +
       'Do not try another way. Tell the user they can enable it with /rights.',
@@ -62,7 +63,8 @@ const TEXTE = {
     titel: (kn) => `Rechte für ${kn}`,
     kopf: (kn, std) => `Rechte für ${kn} (Standard: ${std})`,
     legende: 'Tippen schaltet weiter: 🟢 frei → 🟡 nachfragen → 🔴 aus.',
-    hilfe: 'Ohne Tasten: /rechte <werkzeug> <frei|nachfragen|aus> · alle Kanäle: /rechte * <werkzeug> <stufe>',
+    hilfe: 'Ohne Tasten: /rechte <werkzeug> <frei|nachfragen|aus> · alle Kanäle: /rechte * <werkzeug> <stufe> · unbekannte Werkzeuge: /rechte standard <stufe>',
+    standardText: 'Standard (Werkzeuge ohne Eintrag)',
     hilfeKurz: 'So geht\'s: /rechte <werkzeug> <frei|nachfragen|aus> – zum Beispiel /rechte exec nachfragen',
     gesperrt: (w, k) => `Das Werkzeug „${w}“ ist im Kanal „${k}“ ausgeschaltet (Rechte-Tabelle). ` +
       'Versuche es nicht auf anderem Weg. Sag dem Nutzer, dass er es mit /rechte freischalten kann.',
@@ -282,6 +284,7 @@ export function taste(tabelle, payload) {
 
 // /rights                               → Übersicht des aktuellen Kanals
 // /rights show <kanal|*>                → Übersicht eines anderen Kanals (deutsch: zeige)
+// /rights default <stufe>               → Standard für Werkzeuge ohne Eintrag (deutsch: standard)
 // /rights <werkzeug> <stufe>            → im aktuellen Kanal setzen
 // /rights <kanal|*> <werkzeug> <stufe>  → in einem bestimmten Kanal setzen (Stufe „next“/„weiter“ = nächste Stufe)
 // Stufen deutsch oder englisch. Rückgabe: { kanal (angezeigt), text, neu? (geänderte Tabelle) }
@@ -291,6 +294,12 @@ export function befehl(tabelle, kanal, args) {
   if (['show', 'zeige'].includes(teile[0].toLowerCase())) {
     const ziel = teile[1] ?? kanal;
     return { kanal: ziel, text: uebersicht(tabelle, ziel) };
+  }
+  if (['default', 'standard'].includes(teile[0].toLowerCase()) && teile[1]) {   // gilt für alles ohne eigenen Eintrag
+    const s = stufeName(teile[1]);
+    if (!s) throw new Error(T.stufeFehlt(teile[1]));
+    const neueTabelle = pruefen({ ...structuredClone(tabelle), standard: s });
+    return { kanal, text: `${T.standardText}: ${stufeText(tabelle.standard)} → ${stufeText(s)}\n\n${uebersicht(neueTabelle, kanal)}`, neu: neueTabelle };
   }
   const [zielKanal, werkzeug, gewuenscht] = teile.length >= 3 ? teile : [kanal, ...teile];
   if (!gewuenscht) return { kanal, text: T.hilfeKurz };

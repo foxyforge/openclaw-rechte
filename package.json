@@ -1,6 +1,6 @@
 {
   "name": "openclaw-rechte",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Rechte-Tabelle für OpenClaw: je Kanal und Werkzeug frei, nachfragen oder aus – geprüft im Programm, nicht im Prompt.",
   "private": true,
   "type": "module",

@@ -113,6 +113,14 @@ export function entscheiden(tabelle, kanal, werkzeug, params) {
   return undefined;   // frei: keine Entscheidung, OpenClaw macht normal weiter
 }
 
+// Nur der Besitzer schaltet um. ownerAllowFrom ist OpenClaws Besitzerliste (z. B. "telegram:123"); ist sie leer,
+// genügt ein von OpenClaw zugelassener Absender. Fremde werden still ignoriert (kein Hinweis, dass es Tasten gibt).
+export function darfSchalten(ownerAllowFrom, kanal, senderId, zugelassen) {
+  if (!zugelassen) return false;
+  const besitzer = (Array.isArray(ownerAllowFrom) ? ownerAllowFrom : []).map(String);
+  return besitzer.length === 0 || besitzer.includes(`${kanal}:${senderId}`);
+}
+
 export function naechste(stufe) {
   return STUFEN[(STUFEN.indexOf(stufe) + 1) % STUFEN.length];
 }

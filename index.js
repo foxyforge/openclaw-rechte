@@ -31,8 +31,7 @@ export default definePluginEntry({
       channel: 'telegram',
       namespace: R.NAMENSRAUM,
       handler: async (ctx) => {
-        const besitzer = (api.config?.commands?.ownerAllowFrom ?? []).map(String);
-        if (!ctx.auth?.isAuthorizedSender || (besitzer.length > 0 && !besitzer.includes(`telegram:${ctx.senderId}`))) {
+        if (!R.darfSchalten(api.config?.commands?.ownerAllowFrom, 'telegram', ctx.senderId, ctx.auth?.isAuthorizedSender)) {
           return { handled: true };   // Fremde dürfen nichts umschalten – still ignorieren
         }
         try {

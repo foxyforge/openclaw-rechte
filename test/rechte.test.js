@@ -94,3 +94,12 @@ test('Befehl mit Kanal, „zeige“ und Rückmeldung mit neuer Übersicht', () =
   assert.match(z.text, /Rechte für alle Kanäle/);
   assert.equal(z.neu, undefined);
 });
+
+test('umschalten darf nur der Besitzer; ohne Besitzerliste genügt die Zulassung durch OpenClaw', () => {
+  assert.equal(R.darfSchalten(['telegram:1'], 'telegram', '1', true), true);
+  assert.equal(R.darfSchalten(['telegram:1'], 'telegram', '2', true), false);
+  assert.equal(R.darfSchalten(['telegram:1'], 'discord', '1', true), false);
+  assert.equal(R.darfSchalten(['telegram:1'], 'telegram', '1', false), false);
+  assert.equal(R.darfSchalten([], 'telegram', '9', true), true);
+  assert.equal(R.darfSchalten(undefined, 'telegram', '9', false), false);
+});

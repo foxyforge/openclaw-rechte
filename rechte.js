@@ -113,23 +113,68 @@ export function entscheiden(tabelle, kanal, werkzeug, params) {
   return undefined;   // frei: keine Entscheidung, OpenClaw macht normal weiter
 }
 
-export function uebersicht(tabelle, kanal) {
-  const namen = [...new Set([...GRUNDLISTE, ...tabelle.bekannt,
-    ...Object.keys(tabelle.kanaele[kanal] ?? {}), ...Object.keys(tabelle.kanaele[ALLE_KANAELE] ?? {})])].sort();
-  const zeilen = namen.map((n) => `${ZEICHEN[stufe(tabelle, kanal, n)]} ${n}`);
-  return `Rechte im Kanal „${kanal}“ (Standard: ${ZEICHEN[tabelle.standard]} ${tabelle.standard})\n${zeilen.join('\n')}\n\n` +
-    'Ändern: /rechte <werkzeug> <frei|nachfragen|aus>   ·   für alle Kanäle: /rechte * <werkzeug> <stufe>';
+export function naechste(stufe) {
+  return STUFEN[(STUFEN.indexOf(stufe) + 1) % STUFEN.length];
 }
 
-// /rechte [kanal] [werkzeug] [stufe] – ohne Angaben: Übersicht des aktuellen Kanals.
+function werkzeugliste(tabelle, kanal) {
+  return [...new Set([...GRUNDLISTE, ...tabelle.bekannt,
+    ...Object.keys(tabelle.kanaele[kanal] ?? {}), ...Object.keys(tabelle.kanaele[ALLE_KANAELE] ?? {})])].sort();
+}
+
+function kanalname(kanal) {
+  return kanal === ALLE_KANAELE ? 'alle Kanäle' : `Kanal „${kanal}“`;
+}
+
+export function uebersicht(tabelle, kanal) {
+  const zeilen = werkzeugliste(tabelle, kanal).map((n) => `${ZEICHEN[stufe(tabelle, kanal, n)]} ${n}`);
+  return `Rechte für ${kanalname(kanal)} (Standard: ${ZEICHEN[tabelle.standard]} ${tabelle.standard})\n${zeilen.join('\n')}\n\n` +
+    'Tippen schaltet weiter: 🟢 frei → 🟡 nachfragen → 🔴 aus. ' +
+    'Ohne Tasten: /rechte <werkzeug> <frei|nachfragen|aus> · alle Kanäle: /rechte * <werkzeug> <stufe>';
+}
+
+// Tasten für Kanäle, die sie können (Telegram, Discord …): Jede Taste führt einen /rechte-Befehl aus – mit der
+// nächsten Stufe. So muss niemand tippen, und die Handy-Autokorrektur kann nichts verderben.
+export function praesentation(tabelle, kanal, aktuellerKanal) {
+  const tasten = werkzeugliste(tabelle, kanal).map((n) => {
+    const s = stufe(tabelle, kanal, n);
+    return { label: `${ZEICHEN[s]} ${n}`, action: { type: 'command', command: `/rechte ${kanal} ${n} ${naechste(s)}` }, reusable: true };
+  });
+  const ansichten = [...new Set([aktuellerKanal, ALLE_KANAELE])].map((k) => ({
+    label: `${k === kanal ? '● ' : ''}${k === ALLE_KANAELE ? 'Alle Kanäle' : k}`,
+    action: { type: 'command', command: `/rechte zeige ${k}` },
+    reusable: true,
+  }));
+  return {
+    title: `Rechte für ${kanalname(kanal)}`,
+    blocks: [
+      { type: 'text', text: `Tippen schaltet weiter: 🟢 frei → 🟡 nachfragen → 🔴 aus (Standard: ${tabelle.standard}).` },
+      { type: 'buttons', buttons: tasten },
+      { type: 'buttons', buttons: ansichten },
+    ],
+  };
+}
+
+// /rechte                               → Übersicht des aktuellen Kanals
+// /rechte zeige <kanal|*>               → Übersicht eines anderen Kanals
+// /rechte <werkzeug> <stufe>            → im aktuellen Kanal setzen
+// /rechte <kanal|*> <werkzeug> <stufe>  → in einem bestimmten Kanal setzen
+// Rückgabe: { kanal (angezeigt), text, neu? (geänderte Tabelle) }
 export function befehl(tabelle, kanal, args) {
   const teile = String(args ?? '').trim().split(/\s+/).filter(Boolean);
-  if (teile.length === 0) return { text: uebersicht(tabelle, kanal) };
+  if (teile.length === 0) return { kanal, text: uebersicht(tabelle, kanal) };
+  if (teile[0].toLowerCase() === 'zeige') {
+    const ziel = teile[1] ?? kanal;
+    return { kanal: ziel, text: uebersicht(tabelle, ziel) };
+  }
   let [zielKanal, werkzeug, neu] = teile.length >= 3 ? teile : [kanal, ...teile];
-  if (!neu) return { text: `So geht's: /rechte <werkzeug> <frei|nachfragen|aus> – zum Beispiel /rechte exec nachfragen` };
+  if (!neu) return { kanal, text: 'So geht\'s: /rechte <werkzeug> <frei|nachfragen|aus> – zum Beispiel /rechte exec nachfragen' };
   neu = neu.toLowerCase();
   const alt = stufe(tabelle, zielKanal, werkzeug);
   const neueTabelle = setzen(tabelle, zielKanal, werkzeug, neu);
-  const wo = zielKanal === ALLE_KANAELE ? 'alle Kanäle' : `Kanal „${zielKanal}“`;
-  return { text: `${werkzeug}: ${ZEICHEN[alt]} ${alt} → ${ZEICHEN[neu]} ${neu} (${wo})`, neu: neueTabelle };
+  return {
+    kanal: zielKanal,
+    text: `${werkzeug}: ${ZEICHEN[alt]} ${alt} → ${ZEICHEN[neu]} ${neu} (${kanalname(zielKanal)})\n\n${uebersicht(neueTabelle, zielKanal)}`,
+    neu: neueTabelle,
+  };
 }

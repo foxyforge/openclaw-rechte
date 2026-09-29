@@ -1,8 +1,5 @@
 // Rechte – OpenClaw-Einstieg. Die Logik steht in rechte.js (ohne OpenClaw testbar).
-import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
-
-const SPUR = (text) => { try { appendFileSync('/tmp/claude-1000/rechte-spur.log', `${new Date().toISOString()} ${text}\n`); } catch { /* nur Fehlersuche */ } };
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import * as R from './rechte.js';
 
@@ -12,11 +9,9 @@ export default definePluginEntry({
   description: 'Rechte-Tabelle: je Kanal und Werkzeug frei, nachfragen oder aus. Umschalten mit /rechte.',
   register(api) {
     const datei = join(api.runtime.state.resolveStateDir(), 'rechte', 'tabelle.json');
-    SPUR(`register mode=${api.registrationMode} datei=${datei}`);
 
     api.on('before_tool_call', (event, ctx) => {
       const werkzeug = event?.toolName ?? event?.name;
-      SPUR(`before_tool_call ${werkzeug} kanal=${ctx?.requester?.channel}`);
       if (!werkzeug) return undefined;
       let tabelle;
       try {
@@ -33,15 +28,21 @@ export default definePluginEntry({
 
     api.registerCommand({
       name: 'rechte',
-      description: 'Rechte je Werkzeug zeigen oder ändern: /rechte · /rechte <werkzeug> <frei|nachfragen|aus>',
+      description: 'Rechte je Werkzeug: Tabelle mit Tasten (tippen schaltet weiter) · /rechte <werkzeug> <frei|nachfragen|aus>',
       acceptsArgs: true,
       requireAuth: true,
       handler: async (ctx) => {
         if (ctx.senderIsOwner === false) return { text: 'Nur der Besitzer darf die Rechte ändern.' };
         try {
-          const ergebnis = R.befehl(R.laden(datei), ctx.channel ?? 'unbekannt', ctx.args);
+          const kanal = ctx.channel ?? 'unbekannt';
+          const ergebnis = R.befehl(R.laden(datei), kanal, ctx.args);
           if (ergebnis.neu) R.speichern(datei, ergebnis.neu);
-          return { text: ergebnis.text };
+          // Text für Kanäle ohne Tasten, Tasten für alle anderen (OpenClaw wählt je Kanal).
+          return {
+            text: ergebnis.text,
+            presentation: R.praesentation(ergebnis.neu ?? R.laden(datei), ergebnis.kanal, kanal),
+            presentationTextMode: 'fallback',
+          };
         } catch (fehler) {
           return { text: `Nicht geändert: ${fehler.message}` };
         }

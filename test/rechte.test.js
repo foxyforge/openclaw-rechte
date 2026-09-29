@@ -31,7 +31,7 @@ test('/rechte zeigt, ändert und lehnt Unsinn ab', () => {
   assert.match(R.befehl(t, 'telegram', '').text, /🟢 exec/);
   const r = R.befehl(t, 'telegram', 'exec aus');
   assert.equal(R.stufe(r.neu, 'telegram', 'exec'), 'aus');
-  assert.match(r.text, /exec: 🟢 frei → 🔴 aus \(Kanal „telegram“\)/);
+  assert.match(r.text, /exec: 🟢 frei → 🔴 aus/);
   const alle = R.befehl(t, 'telegram', '* web_fetch nachfragen');
   assert.equal(R.stufe(alle.neu, 'discord', 'web_fetch'), 'nachfragen');
   assert.throws(() => R.befehl(t, 'telegram', 'exec vielleicht'), /gibt es nicht/);
@@ -49,4 +49,29 @@ test('speichern ist atomar, kaputte Datei führt zum Fehler (der Einstieg sperrt
   assert.throws(() => R.laden(datei));
   writeFileSync(datei, JSON.stringify({ standard: 'vielleicht', kanaele: {} }));
   assert.throws(() => R.laden(datei), /gibt es nicht/);
+});
+
+test('Tasten schalten zur nächsten Stufe und führen einen sicheren /rechte-Befehl aus', () => {
+  const t = R.setzen(R.leer(), 'telegram', 'read', 'nachfragen');
+  const p = R.praesentation(t, 'telegram', 'telegram');
+  const tasten = p.blocks.find((b) => b.type === 'buttons').buttons;
+  const read = tasten.find((b) => b.label.endsWith(' read'));
+  assert.equal(read.label, '🟡 read');
+  assert.deepEqual(read.action, { type: 'command', command: '/rechte telegram read aus' });
+  assert.equal(tasten.find((b) => b.label.endsWith(' exec')).action.command, '/rechte telegram exec nachfragen');
+  for (const b of tasten) assert.match(b.action.command, /^\/rechte [\w*.:-]+ [\w.:-]+ (frei|nachfragen|aus)$/);
+  const ansichten = p.blocks.at(-1).buttons.map((b) => b.label);
+  assert.deepEqual(ansichten, ['● telegram', 'Alle Kanäle']);
+  assert.equal(R.naechste('aus'), 'frei');
+});
+
+test('Befehl mit Kanal, „zeige“ und Rückmeldung mit neuer Übersicht', () => {
+  const r = R.befehl(R.leer(), 'telegram', 'telegram read aus');
+  assert.equal(r.kanal, 'telegram');
+  assert.match(r.text, /read: 🟢 frei → 🔴 aus \(Kanal „telegram“\)/);
+  assert.match(r.text, /🔴 read/);
+  const z = R.befehl(r.neu, 'telegram', 'zeige *');
+  assert.equal(z.kanal, '*');
+  assert.match(z.text, /Rechte für alle Kanäle/);
+  assert.equal(z.neu, undefined);
 });

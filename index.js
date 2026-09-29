@@ -1,4 +1,5 @@
 // Rechte – OpenClaw-Einstieg. Die Logik steht in rechte.js (ohne OpenClaw testbar).
+import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import * as R from './rechte.js';
@@ -11,10 +12,16 @@ export default definePluginEntry({
     const datei = join(api.runtime.state.resolveStateDir(), 'rechte', 'tabelle.json');
     R.spracheSetzen(api.pluginConfig?.language);   // 'de' oder 'en' (Standard); nur die sichtbaren Texte
     const T = R.texte();
+    // VORÜBERGEHEND: Spur der Kanal-Erkennung (nur Namen, keine Parameter) – nach der Prüfung entfernen.
+    const spurDatei = join(api.runtime.state.resolveStateDir(), 'rechte', 'spur.jsonl');
+    const spur = (eintrag) => { try { appendFileSync(spurDatei, `${JSON.stringify({ zeit: new Date().toISOString(), ...eintrag })}\n`); } catch { /* egal */ } };
 
     api.on('before_tool_call', (event, ctx) => {
-      const werkzeug = event?.toolName ?? event?.name;
+      const werkzeug = R.werkzeugName(event, ctx);
       if (!werkzeug) return undefined;
+      const kanal = R.kanalVon(ctx);
+      spur({ werkzeug: event?.toolName, art: event?.toolKind ?? ctx?.toolKind, channelId: ctx?.channelId,
+        requester: ctx?.requester?.channel, kanal });   // VORÜBERGEHEND: Kanal-Erkennung prüfen, danach entfernen
       let tabelle;
       try {
         tabelle = R.laden(datei);
@@ -25,7 +32,7 @@ export default definePluginEntry({
         tabelle.bekannt.push(werkzeug);
         try { R.speichern(datei, tabelle); } catch (fehler) { api.logger?.warn?.(`rechte: ${fehler.message}`); }
       }
-      return R.entscheiden(tabelle, ctx?.requester?.channel ?? 'unknown', werkzeug, event?.params);
+      return R.entscheiden(tabelle, kanal, werkzeug, event?.params, { codeModeIsoliert: R.codeModeIsoliert(api.config) });
     }, { priority: 100 });
 
     // Tastendruck in Telegram: kommt direkt hierher (nicht ans Modell) und ändert dieselbe Nachricht.

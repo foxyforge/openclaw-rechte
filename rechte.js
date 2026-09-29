@@ -53,6 +53,7 @@ const TEXTE = {
     nurBesitzer: 'Only the owner may change the rights.',
     nichtGeaendert: (m) => `Not changed: ${m}`,
     befehlBeschreibung: 'Rights per tool: table with buttons (tap to cycle) · /rights <tool> <allow|ask|off>',
+    codeModeOffen: 'Code Mode runs without the QuickJS sandbox (tools.codeMode.executor ≠ "quickjs") – asking instead of allowing.',
   },
   de: {
     stufe: { allow: 'frei', ask: 'nachfragen', off: 'aus' },
@@ -81,6 +82,7 @@ const TEXTE = {
     nurBesitzer: 'Nur der Besitzer darf die Rechte ändern.',
     nichtGeaendert: (m) => `Nicht geändert: ${m}`,
     befehlBeschreibung: 'Rechte je Werkzeug: Tabelle mit Tasten (tippen schaltet weiter) · /rechte <werkzeug> <frei|nachfragen|aus>',
+    codeModeOffen: 'Code Mode läuft ohne QuickJS-Abschottung (tools.codeMode.executor ≠ "quickjs") – deshalb Rückfrage statt frei.',
   },
 };
 
@@ -103,7 +105,7 @@ export function leer() {
 // Häufige OpenClaw-Werkzeuge, damit die Tabelle schon vor dem ersten Aufruf etwas zeigt. Weitere kommen dazu,
 // sobald das Modell sie zum ersten Mal benutzt (Liste „bekannt“).
 export const GRUNDLISTE = ['exec', 'process', 'read', 'write', 'edit', 'apply_patch', 'browser', 'web_fetch',
-  'web_search', 'message', 'cron', 'gateway', 'sessions_spawn', 'sessions_send'];
+  'web_search', 'message', 'cron', 'gateway', 'sessions_spawn', 'sessions_send', 'code_mode'];
 
 // Deutsch oder englisch → gespeicherte Stufe; undefined, wenn es die Stufe nicht gibt.
 export function stufeName(wert) {
@@ -167,12 +169,39 @@ export function setzen(tabelle, kanal, werkzeug, neu) {
   return t;
 }
 
+// Welcher Kanal hat den Zug ausgelöst? OpenClaw liefert `requester` nur, wenn es den Absender belegen kann – mit der
+// Codex-Laufzeit (GPT-Modelle über das ChatGPT-Abo) fehlt er. Dann gilt `channelId` aus dem Werkzeug-Kontext; fehlt
+// auch der, ist der Kanal „unknown“ und es gelten die Einträge für alle Kanäle (streng statt offen).
+export function kanalVon(ctx) {
+  const roh = ctx?.requester?.channel ?? ctx?.channelId;
+  const kanal = typeof roh === 'string' ? roh.split(':')[0].trim() : '';
+  return kanal || 'unknown';
+}
+
+// Code Mode: Das Modell schreibt ein kleines JavaScript, das die eigentlichen Werkzeuge aufruft. OpenClaw meldet diesen
+// Rahmen als „exec“ mit toolKind „code_mode_exec“ – das ist KEIN Shell-Befehl. Er bekommt deshalb einen eigenen Eintrag
+// („code_mode“); jedes Werkzeug, das der Code darin aufruft, prüft diese Erweiterung trotzdem einzeln.
+export const CODE_MODE = 'code_mode';
+export function werkzeugName(event, ctx) {
+  const art = event?.toolKind ?? ctx?.toolKind;
+  if (art === 'code_mode_exec') return CODE_MODE;
+  return event?.toolName ?? event?.name ?? ctx?.toolName;
+}
+
+// Nur der QuickJS-Ausführer schottet den Code ab (kein Dateisystem, kein Netz, keine Prozesse). Der Standard-Ausführer
+// (node:vm) ist laut OpenClaw-Doku keine Sicherheitsgrenze – dann wird aus „frei“ für code_mode eine Rückfrage.
+export function codeModeIsoliert(config) {
+  const cm = config?.tools?.codeMode;
+  return Boolean(cm && typeof cm === 'object' && cm.executor === 'quickjs');
+}
+
 // Kurzfassung der Parameter für die Freigabe-Karte: nur Schlüssel und gekürzte Werte, Geheimnisse geschwärzt.
 const GEHEIM = /(key|token|secret|passw|password|auth|cookie)/i;
 export function kurzfassung(params) {
   if (!params || typeof params !== 'object') return '';
   const teile = [];
   for (const [schluessel, wert] of Object.entries(params)) {
+    if (schluessel === 'command' && params.code !== undefined && wert === params.code) continue;   // Code-Mode-Alias
     let text = typeof wert === 'string' ? wert : JSON.stringify(wert);
     if (GEHEIM.test(schluessel)) text = T.geschwaerzt;
     text = String(text ?? '').replace(/\s+/g, ' ');
@@ -183,8 +212,10 @@ export function kurzfassung(params) {
 }
 
 // Die eigentliche Entscheidung für before_tool_call. Rückgabe im Format von OpenClaw.
-export function entscheiden(tabelle, kanal, werkzeug, params) {
-  const s = stufe(tabelle, kanal, werkzeug);
+export function entscheiden(tabelle, kanal, werkzeug, params, { codeModeIsoliert: isoliert = true } = {}) {
+  let s = stufe(tabelle, kanal, werkzeug);
+  let hinweis = '';
+  if (werkzeug === CODE_MODE && s === 'allow' && !isoliert) { s = 'ask'; hinweis = `${T.codeModeOffen} `; }
   if (s === 'off') {
     return { block: true, blockReason: T.gesperrt(werkzeug, kanal) };
   }
@@ -192,7 +223,7 @@ export function entscheiden(tabelle, kanal, werkzeug, params) {
     return {
       requireApproval: {
         title: T.frage(werkzeug).slice(0, 80),
-        description: (`${T.frageKanal(kanal)} ${kurzfassung(params)}`).slice(0, 512),
+        description: (`${hinweis}${T.frageKanal(kanal)} ${kurzfassung(params)}`).slice(0, 512),
         severity: 'warning',
         allowedDecisions: ['allow-once', 'deny'],   // „immer erlauben“ ginge an der Tabelle vorbei
       },

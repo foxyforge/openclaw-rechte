@@ -146,3 +146,27 @@ test('Standard umstellen: gilt für Werkzeuge ohne Eintrag, in beiden Sprachen',
   assert.throws(() => R.befehl(R.leer(), 'telegram', 'standard vielleicht'), /gibt es nicht/);
   assert.equal(R.befehl(R.leer(), 'telegram', 'standard').text.includes('So geht'), true);   // ohne Stufe: Hilfe
 });
+
+test('Kanal: requester vor channelId, „telegram:…“ wird gekürzt, sonst unknown', () => {
+  assert.equal(R.kanalVon({ requester: { channel: 'telegram' }, channelId: 'discord' }), 'telegram');
+  assert.equal(R.kanalVon({ channelId: 'telegram' }), 'telegram');
+  assert.equal(R.kanalVon({ channelId: 'telegram:8911601751' }), 'telegram');
+  assert.equal(R.kanalVon({}), 'unknown');
+  assert.equal(R.kanalVon(undefined), 'unknown');
+});
+
+test('Code Mode ist kein Shell-exec: eigener Eintrag, frei nur mit QuickJS', () => {
+  assert.equal(R.werkzeugName({ toolName: 'exec', toolKind: 'code_mode_exec' }, {}), 'code_mode');
+  assert.equal(R.werkzeugName({ toolName: 'exec' }, { toolKind: 'code_mode_exec' }), 'code_mode');
+  assert.equal(R.werkzeugName({ toolName: 'exec' }, {}), 'exec');
+  const t = R.setzen(R.leer(), 'telegram', 'code_mode', 'frei');
+  assert.equal(R.entscheiden(t, 'telegram', 'code_mode', { code: 'x' }, { codeModeIsoliert: true }), undefined);
+  const frage = R.entscheiden(t, 'telegram', 'code_mode', { code: 'x', command: 'x' }, { codeModeIsoliert: false });
+  assert.match(frage.requireApproval.description, /QuickJS/);
+  assert.ok(!frage.requireApproval.description.includes('command:'), 'command-Alias nicht doppelt');
+  assert.equal(R.codeModeIsoliert({ tools: { codeMode: { enabled: 'auto', executor: 'quickjs' } } }), true);
+  assert.equal(R.codeModeIsoliert({ tools: { codeMode: { executor: 'node' } } }), false);
+  assert.equal(R.codeModeIsoliert({}), false);
+  // shell-exec bleibt, wie er in der Tabelle steht
+  assert.equal(R.entscheiden(R.setzen(t, 'telegram', 'exec', 'aus'), 'telegram', 'exec', {}).block, true);
+});

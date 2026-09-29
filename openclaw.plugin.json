@@ -1,0 +1,7 @@
+{
+  "id": "rechte",
+  "name": "Rechte",
+  "description": "Rechte-Tabelle: je Kanal und Werkzeug frei, nachfragen oder aus. Umschalten mit /rechte.",
+  "activation": { "onStartup": true },
+  "configSchema": { "type": "object", "additionalProperties": false }
+}

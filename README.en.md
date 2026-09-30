@@ -86,6 +86,14 @@ show up on the next `/rights`.
   `code_mode` with the hardened QuickJS executor (`tools.codeMode.executor: "quickjs"`); with the default executor
   (node:vm, per OpenClaw not a security boundary) it is downgraded to ask.
 
+## Scheduled runs (since 0.7)
+
+Runs of scheduled jobs (OpenClaw automations, e.g. a daily briefing) have neither a sender nor a channel. The plugin recognises
+them by their session key (`agent:<id>:cron:…`) and gives them a channel of their own, **`cron`**. That way you can allow
+read-only tools for a schedule (`/rights cron web_search allow`, overview with `/rights show cron`) without also opening the
+terminal (`unknown`). In channel `cron`, "ask" acts like "off": nobody is there to answer, so instead of an approval card
+at 6 a.m. the model gets a reason and continues without the tool.
+
 ## Protected files (since 0.6)
 
 Some files the agent should never change itself – its character and its rules, for example. The `schutz` setting lists
@@ -153,7 +161,7 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 - **Secrets:** none. The only setting is `language` (`en`/`de`).
 - **Updating:** install the new version (or `git pull` the folder) and restart the gateway. The table is kept; older tables
   with German level names are translated on load.
-- **Smoke test without a gateway:** `npm test` (16 tests, Node only).
+- **Smoke test without a gateway:** `npm test` (17 tests, Node only).
 - **Smoke test on a live gateway (Telegram):** `/rights read off`, then ask the bot to read a file → it reports the block and
   does not read. `/rights read ask` → approval card, after "Allow" it reads. `/rights read allow` → reads without asking.
 
@@ -161,7 +169,7 @@ If the file is corrupt, the plugin **blocks** every tool call with a message –
 
 - `rechte.js` – all the logic, no OpenClaw dependency (table, decision, command, buttons, texts en/de).
 - `index.js` – the OpenClaw entry (`before_tool_call`, `/rights` + `/rechte`, button handler).
-- `test/rechte.test.js` – 16 tests, `npm test` (Node only, no extra packages).
+- `test/rechte.test.js` – 17 tests, `npm test` (Node only, no extra packages).
 
 Verified live on 2026-09-29 in Telegram: show the table; all three levels (allow reads without asking, ask shows
 the approval buttons and reads after "Allow", off is intercepted in code and explained to the user); buttons

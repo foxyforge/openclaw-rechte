@@ -150,9 +150,26 @@ test('Standard umstellen: gilt für Werkzeuge ohne Eintrag, in beiden Sprachen',
 test('Kanal: requester vor channelId, „telegram:…“ wird gekürzt, sonst unknown', () => {
   assert.equal(R.kanalVon({ requester: { channel: 'telegram' }, channelId: 'discord' }), 'telegram');
   assert.equal(R.kanalVon({ channelId: 'telegram' }), 'telegram');
-  assert.equal(R.kanalVon({ channelId: 'telegram:8911601751' }), 'telegram');
+  assert.equal(R.kanalVon({ channelId: 'telegram:123456789' }), 'telegram');
   assert.equal(R.kanalVon({}), 'unknown');
   assert.equal(R.kanalVon(undefined), 'unknown');
+});
+
+test('Zeitplan-Läufe haben einen eigenen Kanal „cron“ – das Terminal bleibt „unknown“', () => {
+  assert.equal(R.kanalVon({ sessionKey: 'agent:main:cron:3f65e237:run:482c7d59' }), 'cron');
+  // Mit Zustellziel setzt OpenClaw channelId auf die Chatnummer – der Lauf bleibt trotzdem „cron“
+  assert.equal(R.kanalVon({ sessionKey: 'agent:main:cron:3f65e237:run:aaae', channelId: '123456789' }), 'cron');
+  assert.equal(R.kanalVon({ sessionKey: 'agent:main:telegram:direct:1', channelId: 'telegram' }), 'telegram');
+  assert.equal(R.kanalVon({ sessionKey: 'agent:main:main' }), 'unknown');
+  assert.equal(R.kanalVon({ sessionKey: 'agent:main:probe-cron:1' }), 'unknown');
+  const t = R.setzen({ ...R.leer(), standard: 'ask' }, 'cron', 'web_search', 'allow');   // strenge Tabelle
+  assert.equal(R.entscheiden(t, 'cron', 'web_search', {}), undefined);
+  assert.notEqual(R.entscheiden(t, 'unknown', 'web_search', {}), undefined);
+  // „nachfragen“ wird im Zeitplan zu „gesperrt“ – keine Freigabe-Karte um 6 Uhr früh
+  const e = R.entscheiden(t, 'cron', 'write', { path: 'x.md' });
+  assert.equal(e.block, true);
+  assert.equal(e.requireApproval, undefined);
+  assert.equal(R.entscheiden(t, 'unknown', 'write', {}).requireApproval !== undefined, true);
 });
 
 test('Code Mode ist kein Shell-exec: eigener Eintrag, frei nur mit QuickJS', () => {

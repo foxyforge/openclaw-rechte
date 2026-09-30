@@ -87,6 +87,14 @@ sie beim nächsten `/rechte` sieht.
   (`tools.codeMode.executor: "quickjs"`); mit dem Standard-Ausführer (node:vm, laut OpenClaw keine Sicherheitsgrenze)
   wird daraus eine Rückfrage.
 
+## Zeitpläne (ab 0.7)
+
+Läufe von Zeitplänen (OpenClaw-Automationen, z. B. eine tägliche Tageslage) haben weder Absender noch Kanal. Die Erweiterung
+erkennt sie am Sitzungsschlüssel (`agent:<id>:cron:…`) und gibt ihnen einen eigenen Kanal **`cron`**. So kann man einem
+Zeitplan gezielt lesende Werkzeuge freigeben (`/rechte cron web_search frei`, Übersicht mit `/rechte zeige cron`), ohne das
+Terminal (`unknown`) mitzuöffnen. „Nachfragen“ wirkt im Kanal `cron` wie „aus“: Beim Zeitplan ist niemand da, der
+antwortet – statt einer Freigabe-Karte früh um 6 bekommt das Modell eine Begründung und macht ohne das Werkzeug weiter.
+
 ## Geschützte Dateien (ab 0.6)
 
 Manche Dateien soll der Agent nie selbst ändern – etwa seinen Charakter und seine Regeln. Die Einstellung `schutz`
@@ -156,7 +164,7 @@ erlaubt.
 - **Geheimnisse:** keine. Einzige Einstellung: `language` (`en`/`de`).
 - **Aktualisieren:** neue Version installieren (bzw. Ordner per `git pull` holen), Gateway neu starten. Die Tabelle bleibt
   erhalten; ältere Tabellen mit deutschen Stufen werden beim Laden übersetzt.
-- **Prüfung ohne Gateway:** `npm test` (16 Tests, nur Node).
+- **Prüfung ohne Gateway:** `npm test` (17 Tests, nur Node).
 - **Prüfung am lebenden Gateway (Telegram):** `/rights read off`, dann den Bot bitten, eine Datei zu lesen → er meldet die
   Sperre und liest nicht. `/rights read ask` → Freigabe-Karte, nach „Erlauben“ liest er. `/rights read allow` → liest ohne Frage.
 
@@ -164,7 +172,7 @@ erlaubt.
 
 - `rechte.js` – die ganze Logik, ohne OpenClaw-Abhängigkeit (Tabelle, Entscheidung, Befehl, Tasten, Texte de/en).
 - `index.js` – der Einstieg für OpenClaw (`before_tool_call`, `/rights` + `/rechte`, Tastendruck-Handler).
-- `test/rechte.test.js` – 16 Tests, `npm test` (nur Node, keine weiteren Pakete).
+- `test/rechte.test.js` – 17 Tests, `npm test` (nur Node, keine weiteren Pakete).
 
 Live geprüft am 29.09.2026 in Telegram: Tabelle anzeigen, alle drei Stufen (frei liest ohne Frage, nachfragen zeigt
 die Freigabe-Tasten und liest nach „Erlauben“, aus wird im Programm abgefangen und dem Nutzer erklärt), Tasten

@@ -56,6 +56,8 @@ const TEXTE = {
     codeModeOffen: 'Code Mode runs without the QuickJS sandbox (tools.codeMode.executor ≠ "quickjs") – asking instead of allowing.',
     geschuetzt: (d) => `“${d}” is protected (rights table): only the owner changes this file. Do not try another way.`,
     geschuetztFrage: (d) => `Protected file ${d}.`,
+    zeitplanOhneRueckfrage: (w) => `${w} is not allowed in scheduled runs (channel cron) – nobody can be asked there. `
+      + 'Continue without it and mention it in the result.',
   },
   de: {
     stufe: { allow: 'frei', ask: 'nachfragen', off: 'aus' },
@@ -87,6 +89,8 @@ const TEXTE = {
     codeModeOffen: 'Code Mode läuft ohne QuickJS-Abschottung (tools.codeMode.executor ≠ "quickjs") – deshalb Rückfrage statt frei.',
     geschuetzt: (d) => `„${d}“ ist geschützt (Rechte-Tabelle): Diese Datei ändert nur Chris. Versuche es nicht auf anderem Weg.`,
     geschuetztFrage: (d) => `Geschützte Datei ${d}.`,
+    zeitplanOhneRueckfrage: (w) => `${w} ist im Zeitplan (Kanal cron) nicht freigegeben – dort kann niemand gefragt werden. `
+      + 'Mach ohne weiter und nenne es im Ergebnis.',
   },
 };
 
@@ -173,10 +177,15 @@ export function setzen(tabelle, kanal, werkzeug, neu) {
   return t;
 }
 
-// Welcher Kanal hat den Zug ausgelöst? OpenClaw liefert `requester` nur, wenn es den Absender belegen kann – mit der
-// Codex-Laufzeit (GPT-Modelle über das ChatGPT-Abo) fehlt er. Dann gilt `channelId` aus dem Werkzeug-Kontext; fehlt
-// auch der, ist der Kanal „unknown“ und es gelten die Einträge für alle Kanäle (streng statt offen).
+// Welcher Kanal hat den Zug ausgelöst? Zeitplan-Läufe (Automationen, Sitzungsschlüssel „agent:<id>:cron:…“) heißen
+// immer „cron“ – dort ist `channelId` nur das Zustellziel (z. B. die Telegram-Chatnummer), kein Absender; so haben sie
+// eine eigene Zeile, ohne das Terminal mitzuöffnen. Sonst: OpenClaw liefert `requester` nur, wenn es den Absender belegen
+// kann – mit der Codex-Laufzeit fehlt er, dann gilt `channelId`. Fehlt auch der, ist der Kanal „unknown“ und es gelten
+// die Einträge für alle Kanäle (streng statt offen).
+export const ZEITPLAN_KANAL = 'cron';
+const ZEITPLAN = /^agent:[^:]+:cron:/;
 export function kanalVon(ctx) {
+  if (ZEITPLAN.test(String(ctx?.sessionKey ?? ''))) return ZEITPLAN_KANAL;
   const roh = ctx?.requester?.channel ?? ctx?.channelId;
   const kanal = typeof roh === 'string' ? roh.split(':')[0].trim() : '';
   return kanal || 'unknown';
@@ -250,6 +259,8 @@ export function entscheiden(tabelle, kanal, werkzeug, params, { codeModeIsoliert
     return { block: true, blockReason: T.gesperrt(werkzeug, kanal) };
   }
   if (s === 'ask') {
+    // Im Zeitplan fragt man niemanden – sonst landet morgens um 6 eine Freigabe-Karte beim Besitzer. Also: gesperrt.
+    if (kanal === ZEITPLAN_KANAL) return { block: true, blockReason: T.zeitplanOhneRueckfrage(werkzeug) };
     return {
       requireApproval: {
         title: T.frage(werkzeug).slice(0, 80),
